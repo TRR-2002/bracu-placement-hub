@@ -16,7 +16,6 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Authentication Middleware to protect routes
 const auth = (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
   if (!token) {
@@ -24,7 +23,6 @@ const auth = (req, res, next) => {
       .status(401)
       .json({ success: false, error: "Access denied. No token provided." });
   }
-
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
@@ -40,14 +38,12 @@ const auth = (req, res, next) => {
 const MONGODB_URI = process.env.MONGO_URI;
 mongoose
   .connect(MONGODB_URI)
-  .then(() => console.log("MongoDB connected successfully!"))
+  .then(() => console.log("MongoDB connected successfully! "))
   .catch((err) => console.error("MongoDB connection failed:", err));
 
 // =================================================================
 //                         MONGOOSE SCHEMAS & MODELS
 // =================================================================
-
-// --- User/Student Schema ---
 const UserSchema = new mongoose.Schema(
   {
     userId: { type: String, required: true, unique: true },
@@ -60,7 +56,6 @@ const UserSchema = new mongoose.Schema(
       enum: ["student", "recruiter", "admin"],
       default: "student",
     },
-    // Detailed Profile Fields
     department: String,
     cgpa: Number,
     skills: [String],
@@ -73,20 +68,24 @@ const UserSchema = new mongoose.Schema(
         description: String,
       },
     ],
-    education: [
-      {
-        institution: String,
-        degree: String,
-        year: String,
-      },
-    ],
+    education: [{ institution: String, degree: String, year: String }],
   },
   { timestamps: true }
 );
-
 const User = mongoose.model("User", UserSchema);
 
-// --- Application Schema ---
+const JobSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    company: { type: String, required: true },
+    location: String,
+    salaryMin: Number,
+    description: String,
+  },
+  { timestamps: true }
+);
+const Job = mongoose.model("Job", JobSchema);
+
 const ApplicationSchema = new mongoose.Schema(
   {
     job: { type: mongoose.Schema.Types.ObjectId, ref: "Job" },
@@ -99,31 +98,18 @@ const ApplicationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
 const Application = mongoose.model("Application", ApplicationSchema);
-// --- Notification Schema ---
+
 const NotificationSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    message: {
-      type: String,
-      required: true,
-    },
-    read: {
-      type: Boolean,
-      default: false,
-    },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    message: { type: String, required: true },
+    read: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
-
 const Notification = mongoose.model("Notification", NotificationSchema);
 
-// --- Dashboard Schema for Saved Jobs ---
 const DashboardSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -138,23 +124,24 @@ const Dashboard = mongoose.model("Dashboard", DashboardSchema);
 // =================================================================
 //                         AUTHENTICATION APIs
 // =================================================================
-
-// --- Register New User ---
 app.post("/api/auth/register", async (req, res) => {
   try {
-    const { name, email, password, role, department, cgpa, skills, interests } =
-      req.body;
+    const { name, email, password, role } = req.body;
     if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: "Name, email, and password are required",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: "Name, email, and password are required",
+        });
     }
     if (!email.endsWith("@g.bracu.ac.bd")) {
-      return res.status(400).json({
-        success: false,
-        error: "Only @g.bracu.ac.bd email addresses are allowed",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: "Only @g.bracu.ac.bd email addresses are allowed",
+        });
     }
     let user = await User.findOne({ email });
     if (user) {
@@ -165,30 +152,20 @@ app.post("/api/auth/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const userId = email.split("@")[0];
-
-    user = new User({
-      name,
-      userId,
-      email,
-      password: hashedPassword,
-      role,
-      department,
-      cgpa,
-      skills,
-      interests,
-    });
+    user = new User({ name, userId, email, password: hashedPassword, role });
     await user.save();
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      userId: user.userId,
-    });
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "User registered successfully",
+        userId: user.userId,
+      });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// --- Login User ---
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -209,7 +186,7 @@ app.post("/api/auth/login", async (req, res) => {
       userId: user.userId,
       role: user.role,
       name: user.name,
-    }; // Add the name here
+    };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "24h",
     });
@@ -229,7 +206,6 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// --- Get User Profile (Protected) ---
 app.get("/api/auth/profile", auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -238,62 +214,61 @@ app.get("/api/auth/profile", auth, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-// --- Update User Profile (Protected + Ownership) ---
-app.put("/api/profile/:userId", auth, async (req, res) => {
-  try {
-    // Ownership Check
-    if (req.user.userId !== req.params.userId) {
-      return res.status(403).json({
-        success: false,
-        error: "Access denied. You can only update your own profile.",
-      });
-    }
 
+app.get("/api/profile/status", auth, async (req, res) => {
+  try {
     const user = await User.findById(req.user.id);
     if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, error: "User not found", hasProfile: false });
+    }
+    const hasProfile = !!(
+      user.skills &&
+      user.skills.length > 0 &&
+      user.interests &&
+      user.interests.length > 0
+    );
+    res.json({ success: true, hasProfile, userId: user.userId });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error.message, hasProfile: false });
+  }
+});
+
+app.put("/api/profile/:userId", auth, async (req, res) => {
+  try {
+    if (req.user.userId !== req.params.userId) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          error: "Access denied. You can only update your own profile.",
+        });
+    }
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.user.id },
+      { $set: req.body },
+      { new: true, runValidators: true }
+    ).select("-password");
+    if (!updatedUser) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
-
-    // Get all potential fields from the request body
-    const {
-      studentId,
-      department,
-      cgpa,
-      skills,
-      interests,
-      workExperience,
-      education,
-    } = req.body;
-
-    // Update ONLY the fields that are part of the student's manageable profile
-    user.studentId = studentId || user.studentId;
-    user.department = department || user.department;
-    user.cgpa = cgpa || user.cgpa;
-    user.skills = skills || user.skills;
-    user.interests = interests || user.interests;
-    user.workExperience = workExperience || user.workExperience;
-    user.education = education || user.education;
-
-    const updatedUser = await user.save();
-
-    const userProfile = updatedUser.toObject();
-    delete userProfile.password; // Ensure password is not sent back
-
     res.json({
       success: true,
       message: "Profile updated successfully",
-      user: userProfile,
+      user: updatedUser,
     });
   } catch (error) {
     console.error("Profile Update Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 // =================================================================
 //                 FEATURE 02: JOB DISCOVERY APIs
 // =================================================================
-
-// --- Search Jobs (Protected) ---
 app.get("/api/jobs/search", auth, async (req, res) => {
   try {
     const { keyword } = req.query;
@@ -307,8 +282,6 @@ app.get("/api/jobs/search", auth, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// --- Get Single Job Details (Protected) ---
 app.get("/api/jobs/:jobId", auth, async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
@@ -320,19 +293,14 @@ app.get("/api/jobs/:jobId", auth, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// --- Apply to Job (Protected) ---
 app.post("/api/jobs/apply", auth, async (req, res) => {
   try {
     const { jobId } = req.body;
-    const userId = req.user.id; // Get user from the token
-
     const job = await Job.findById(jobId);
     if (!job)
       return res.status(404).json({ success: false, error: "Job not found" });
-
     const existingApplication = await Application.findOne({
-      user: userId,
+      user: req.user.id,
       job: jobId,
     });
     if (existingApplication) {
@@ -341,17 +309,18 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
         .json({ success: false, error: "Already applied to this job" });
     }
     const newApplication = new Application({
-      user: userId,
+      user: req.user.id,
       job: jobId,
       status: "Pending",
     });
     await newApplication.save();
-    res.status(201).json({
-      success: true,
-      message: "Application submitted successfully",
-      applicationId: newApplication.id,
-      status: newApplication.status,
-    });
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "Application submitted",
+        application: newApplication,
+      });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -360,8 +329,6 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
 // =================================================================
 //                 FEATURE 01: DASHBOARD APIs
 // =================================================================
-
-// --- API 1: Get All Application Status Details (SPECIFIC ROUTE FIRST) ---
 app.get("/api/dashboard/applications/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -370,32 +337,24 @@ app.get("/api/dashboard/applications/:userId", auth, async (req, res) => {
     const applications = await Application.find({ user: req.user.id })
       .populate("job")
       .sort({ createdAt: -1 });
-
     res.json({ success: true, applications });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// --- API 2: Get Recent Notifications (SPECIFIC ROUTE) ---
 app.get("/api/dashboard/notifications/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
-
-    // Find notifications for the current user in the database
     const notifications = await Notification.find({ user: req.user.id }).sort({
       createdAt: -1,
     });
-
     res.json({ success: true, notifications });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// --- API 3: Get All Saved Jobs (SPECIFIC ROUTE) ---
 app.get("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -404,14 +363,14 @@ app.get("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
     const dashboard = await Dashboard.findOne({ user: req.user.id }).populate(
       "savedJobs"
     );
-    const savedJobs = dashboard ? dashboard.savedJobs : [];
-    res.json({ success: true, savedJobs });
+    res.json({
+      success: true,
+      savedJobs: dashboard ? dashboard.savedJobs : [],
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// --- API 4: Add a Saved Job (POST) ---
 app.post("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -421,7 +380,6 @@ app.post("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
     const job = await Job.findById(jobId);
     if (!job)
       return res.status(404).json({ success: false, error: "Job not found" });
-
     let dashboard = await Dashboard.findOne({ user: req.user.id });
     if (!dashboard) {
       dashboard = new Dashboard({ user: req.user.id, savedJobs: [jobId] });
@@ -439,84 +397,63 @@ app.post("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// --- API 5: Remove a Saved Job (DELETE) ---
 app.delete("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
     const { jobId } = req.body;
-    let dashboard = await Dashboard.findOne({ user: req.user.id });
-    if (dashboard) {
-      dashboard.savedJobs = dashboard.savedJobs.filter(
-        (id) => id.toString() !== jobId
-      );
-      await dashboard.save();
-    }
+    await Dashboard.updateOne(
+      { user: req.user.id },
+      { $pull: { savedJobs: jobId } }
+    );
     res.json({ success: true, message: "Job removed from saved" });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// --- API 6: Get Dashboard Overview (MOST GENERAL - MUST BE LAST) ---
 app.get("/api/dashboard/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
-      return res.status(403).json({
-        success: false,
-        error: "Access denied. You can only access your own data.",
-      });
+      return res.status(403).json({ success: false, error: "Access denied." });
     }
     const user = await User.findById(req.user.id).select("-password");
     if (!user)
       return res.status(404).json({ success: false, error: "User not found" });
-
     const applications = await Application.find({ user: user.id })
       .populate("job")
       .sort({ createdAt: -1 })
       .limit(5);
-
-    let dashboard = await Dashboard.findOne({ user: user.id }).populate(
+    const dashboard = await Dashboard.findOne({ user: user.id }).populate(
       "savedJobs"
     );
-    if (!dashboard) {
-      dashboard = { savedJobs: [] };
-    }
-
-    const dashboardData = {
-      userId: user.userId,
-      studentInfo: {
-        name: user.name,
-        email: user.email,
-        department: user.department,
-        cgpa: user.cgpa,
+    const notifications = await Notification.find({ user: user.id })
+      .sort({ createdAt: -1 })
+      .limit(5);
+    res.json({
+      success: true,
+      data: {
+        userId: user.userId,
+        studentInfo: {
+          name: user.name,
+          email: user.email,
+          department: user.department,
+          cgpa: user.cgpa,
+        },
+        applications,
+        savedJobsCount: dashboard ? dashboard.savedJobs.length : 0,
+        savedJobs: dashboard ? dashboard.savedJobs : [],
+        notifications,
       },
-      applications: applications.map((app) => ({
-        id: app._id,
-        jobTitle: app.job?.title,
-        company: app.job?.company,
-        status: app.status,
-        appliedDate: app.createdAt,
-      })),
-      savedJobsCount: dashboard.savedJobs.length,
-      savedJobs: dashboard.savedJobs,
-      notifications: [
-        { id: "1", message: "Your application was reviewed", read: false },
-        { id: "2", message: "New job matches your profile", read: false },
-      ],
-    };
-    res.json({ success: true, data: dashboardData });
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 // =================================================================
 //                 HELPER APIs FOR TESTING
 // =================================================================
-
-// --- Helper to create test jobs (no auth needed) ---
 app.post("/api/test/create-job", async (req, res) => {
   try {
     const job = new Job(req.body);
@@ -526,31 +463,27 @@ app.post("/api/test/create-job", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-// --- Helper to create a test notification (auth needed) ---
 app.post("/api/test/create-notification", auth, async (req, res) => {
   try {
     const { message } = req.body;
-    const userId = req.user.id; // Get user from the token
-
-    const newNotification = new Notification({
-      user: userId,
-      message: message,
-    });
-
+    const newNotification = new Notification({ user: req.user.id, message });
     await newNotification.save();
-    res.status(201).json({
-      success: true,
-      message: "Test notification created",
-      notification: newNotification,
-    });
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "Test notification created",
+        notification: newNotification,
+      });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 // =================================================================
 //                             SERVER START
 // =================================================================
-const PORT = 1350; // Last 4 digits of student ID: 23101350
+const PORT = 1350;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Student ID: 23101350`);

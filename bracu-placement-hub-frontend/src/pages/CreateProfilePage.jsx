@@ -1,376 +1,340 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
-import api from "../api/axiosConfig";
 
 function CreateProfilePage() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
-    fullName: "",
     studentId: "",
     department: "",
     cgpa: "",
-    skills: "",
-    interests: "",
+    skills: [],
+    interests: [],
   });
-  const [educationHistory, setEducationHistory] = useState([
-    { institution: "", degree: "", year: "" },
-  ]);
-  const [experience, setExperience] = useState([
-    { company: "", position: "", duration: "", description: "" },
-  ]);
+  const [skillInput, setSkillInput] = useState("");
+  const [interestInput, setInterestInput] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
-
+  // Route protection:  Check if user already has a profile
   useEffect(() => {
-    if (user && user.name) {
-      setFormData((prevState) => ({
-        ...prevState,
-        fullName: user.name,
-      }));
-    }
-  }, [user]);
+    const checkProfileStatus = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          navigate("/");
+          return;
+        }
 
-  const handleChange = (e) => {
+        const response = await fetch(
+          "http://localhost:1350/api/profile/status",
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch profile status");
+        }
+
+        const data = await response.json();
+        console.log("Profile Status Check:", data);
+
+        // If user already has a profile, redirect them to view profile
+        if (data.hasProfile) {
+          console.log("User already has a profile.  Redirecting.. .");
+          navigate(`/profile/view/${data.userId}`);
+        }
+      } catch (err) {
+        console.error("Error checking profile status:", err);
+        setError("Error checking profile status.  Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkProfileStatus();
+  }, [navigate]);
+
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prevState) => ({ ...prevState, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  const handleEducationChange = (index, e) => {
-    const updated = [...educationHistory];
-    updated[index][e.target.name] = e.target.value;
-    setEducationHistory(updated);
-  };
-  const addSchool = () => {
-    setEducationHistory([
-      ...educationHistory,
-      { institution: "", degree: "", year: "" },
-    ]);
-  };
-  const removeSchool = (index) => {
-    if (educationHistory.length > 1) {
-      const list = [...educationHistory];
-      list.splice(index, 1);
-      setEducationHistory(list);
+  const handleAddSkill = () => {
+    if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
+      setFormData((prev) => ({
+        ...prev,
+        skills: [...prev.skills, skillInput.trim()],
+      }));
+      setSkillInput("");
     }
   };
 
-  const handleExperienceChange = (index, e) => {
-    const updated = [...experience];
-    updated[index][e.target.name] = e.target.value;
-    setExperience(updated);
+  const handleRemoveSkill = (skillToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      skills: prev.skills.filter((skill) => skill !== skillToRemove),
+    }));
   };
-  const addExperience = () => {
-    setExperience([
-      ...experience,
-      { company: "", position: "", duration: "", description: "" },
-    ]);
-  };
-  const removeExperience = (index) => {
-    if (experience.length > 1) {
-      const list = [...experience];
-      list.splice(index, 1);
-      setExperience(list);
+
+  const handleAddInterest = () => {
+    if (
+      interestInput.trim() &&
+      !formData.interests.includes(interestInput.trim())
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        interests: [...prev.interests, interestInput.trim()],
+      }));
+      setInterestInput("");
     }
+  };
+
+  const handleRemoveInterest = (interestToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      interests: prev.interests.filter(
+        (interest) => interest !== interestToRemove
+      ),
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) {
-      return alert("You must be logged in to create a profile.");
+    setError("");
+    setIsSubmitting(true);
+
+    // Validation
+    if (!formData.department || !formData.cgpa) {
+      setError("Please fill in all required fields.");
+      setIsSubmitting(false);
+      return;
     }
 
-    const profileData = {
-      studentId: formData.studentId,
-      department: formData.department,
-      cgpa: formData.cgpa,
-      skills: formData.skills
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s),
-      interests: formData.interests
-        .split(",")
-        .map((i) => i.trim())
-        .filter((i) => i),
-      education: educationHistory,
-      workExperience: experience,
-    };
+    if (formData.skills.length === 0 || formData.interests.length === 0) {
+      setError("Please add at least one skill and one interest.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      await api.put(`/profile/${user.userId}`, profileData);
-      alert("Profile created successfully! Redirecting...");
-      navigate(`/profile/view/${user.userId}`);
-    } catch (error) {
-      console.error(
-        "Failed to create profile:",
-        error.response?.data || error.message
+      const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("userId");
+
+      if (!token || !userId) {
+        setError("Authentication error. Please log in again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const response = await fetch(
+        `http://localhost:1350/api/profile/${userId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(formData),
+        }
       );
-      alert("Error creating profile. Please check the console.");
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create profile");
+      }
+
+      const data = await response.json();
+      console.log("Profile created successfully:", data);
+      alert("Profile created successfully!");
+      navigate(`/profile/view/${userId}`);
+    } catch (err) {
+      console.error("Error creating profile:", err);
+      setError(err.message || "Failed to create profile. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-gray-50 min-h-screen flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-4xl">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Create Your Profile
-        </h1>
-        <p className="text-gray-500 mb-6">
-          Complete your profile to get discovered by top recruiters
-        </p>
+    <div className="min-h-screen bg-gray-100 py-12 px-4">
+      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
+        <h1 className="text-3xl font-bold mb-6">Create Your Profile</h1>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-700 mb-4">
-              Academic Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
-                </label>
-                <input
-                  name="fullName"
-                  value={formData.fullName}
-                  type="text"
-                  className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100"
-                  readOnly
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Student ID
-                </label>
-                <input
-                  name="studentId"
-                  value={formData.studentId}
-                  onChange={handleChange}
-                  type="text"
-                  placeholder="e.g. 23101350"
-                  className="w-full p-3 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Department
-                </label>
-                <input
-                  name="department"
-                  value={formData.department}
-                  onChange={handleChange}
-                  type="text"
-                  placeholder="e.g. CSE"
-                  className="w-full p-3 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  CGPA
-                </label>
-                <input
-                  name="cgpa"
-                  value={formData.cgpa}
-                  onChange={handleChange}
-                  type="text"
-                  placeholder="e.g. 3.85"
-                  className="w-full p-3 border border-gray-300 rounded-lg"
-                />
-              </div>
-            </div>
+          {/* Student ID */}
+          <div className="mb-4">
+            <label className="block text-gray-700 font-bold mb-2">
+              Student ID
+            </label>
+            <input
+              type="text"
+              name="studentId"
+              value={formData.studentId}
+              onChange={handleInputChange}
+              placeholder="e.g., 23101350"
+              className="w-full p-2 border border-gray-300 rounded-md"
+            />
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-700 mb-4">
-              Skills & Interests
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Skills (comma separated)
-                </label>
-                <textarea
-                  name="skills"
-                  value={formData.skills}
-                  onChange={handleChange}
-                  placeholder="e.g. React, Python, Data Analysis"
-                  className="w-full p-3 border border-gray-300 rounded-lg h-24"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Interests
-                </label>
-                <textarea
-                  name="interests"
-                  value={formData.interests}
-                  onChange={handleChange}
-                  placeholder="e.g. Artificial Intelligence, FinTech"
-                  className="w-full p-3 border border-gray-300 rounded-lg h-24"
-                />
-              </div>
-            </div>
+          {/* Department */}
+          <div className="mb-4">
+            <label className="block text-gray-700 font-bold mb-2">
+              Department *
+            </label>
+            <input
+              type="text"
+              name="department"
+              value={formData.department}
+              onChange={handleInputChange}
+              placeholder="e.g., Computer Science"
+              className="w-full p-2 border border-gray-300 rounded-md"
+              required
+            />
           </div>
 
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-700">
-                  Education History
-                </h2>
-                <p className="text-gray-500">Your academic journey</p>
-              </div>
+          {/* CGPA */}
+          <div className="mb-4">
+            <label className="block text-gray-700 font-bold mb-2">CGPA *</label>
+            <input
+              type="number"
+              name="cgpa"
+              value={formData.cgpa}
+              onChange={handleInputChange}
+              placeholder="e.g., 3.8"
+              step="0.1"
+              min="0"
+              max="4"
+              className="w-full p-2 border border-gray-300 rounded-md"
+              required
+            />
+          </div>
+
+          {/* Skills */}
+          <div className="mb-4">
+            <label className="block text-gray-700 font-bold mb-2">
+              Skills *
+            </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={skillInput}
+                onChange={(e) => setSkillInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddSkill();
+                  }
+                }}
+                placeholder="Add a skill (e.g., JavaScript)"
+                className="flex-1 p-2 border border-gray-300 rounded-md"
+              />
               <button
                 type="button"
-                onClick={addSchool}
-                className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300"
+                onClick={handleAddSkill}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
-                + Add School
+                Add
               </button>
             </div>
-            {educationHistory.map((edu, index) => (
-              <div
-                key={index}
-                className="relative grid grid-cols-1 md:grid-cols-2 gap-6 p-4 pt-8 border border-gray-200 rounded-lg mb-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Institution Name
-                  </label>
-                  <input
-                    name="institution"
-                    value={edu.institution}
-                    onChange={(e) => handleEducationChange(index, e)}
-                    type="text"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Degree/Certificate
-                  </label>
-                  <input
-                    name="degree"
-                    value={edu.degree}
-                    onChange={(e) => handleEducationChange(index, e)}
-                    type="text"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Passing Year
-                  </label>
-                  <input
-                    name="year"
-                    value={edu.year}
-                    onChange={(e) => handleEducationChange(index, e)}
-                    type="text"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                {educationHistory.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {formData.skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center gap-2"
+                >
+                  {skill}
                   <button
                     type="button"
-                    onClick={() => removeSchool(index)}
-                    className="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold text-xl"
+                    onClick={() => handleRemoveSkill(skill)}
+                    className="text-red-600 hover: text-red-800"
                   >
-                    &times;
+                    ×
                   </button>
-                )}
-              </div>
-            ))}
+                </span>
+              ))}
+            </div>
           </div>
 
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-700">
-                  Experience
-                </h2>
-                <p className="text-gray-500">Internships, jobs, or projects</p>
-              </div>
+          {/* Interests */}
+          <div className="mb-6">
+            <label className="block text-gray-700 font-bold mb-2">
+              Interests *
+            </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={interestInput}
+                onChange={(e) => setInterestInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddInterest();
+                  }
+                }}
+                placeholder="Add an interest (e.g., Web Development)"
+                className="flex-1 p-2 border border-gray-300 rounded-md"
+              />
               <button
                 type="button"
-                onClick={addExperience}
-                className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300"
+                onClick={handleAddInterest}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
-                + Add Experience
+                Add
               </button>
             </div>
-            {experience.map((exp, index) => (
-              <div
-                key={index}
-                className="relative p-4 border border-gray-200 rounded-lg mb-4 space-y-4"
-              >
-                {experience.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {formData.interests.map((interest) => (
+                <span
+                  key={interest}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center gap-2"
+                >
+                  {interest}
                   <button
                     type="button"
-                    onClick={() => removeExperience(index)}
-                    className="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold text-xl"
+                    onClick={() => handleRemoveInterest(interest)}
+                    className="text-red-600 hover:text-red-800"
                   >
-                    &times;
+                    ×
                   </button>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Company / Organization
-                    </label>
-                    <input
-                      name="company"
-                      value={exp.company}
-                      onChange={(e) => handleExperienceChange(index, e)}
-                      type="text"
-                      className="w-full p-3 border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Role / Title
-                    </label>
-                    <input
-                      name="position"
-                      value={exp.position}
-                      onChange={(e) => handleExperienceChange(index, e)}
-                      type="text"
-                      className="w-full p-3 border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Duration
-                  </label>
-                  <input
-                    name="duration"
-                    value={exp.duration}
-                    onChange={(e) => handleExperienceChange(index, e)}
-                    type="text"
-                    placeholder="e.g., Jan 2024 - Present"
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    name="description"
-                    value={exp.description}
-                    onChange={(e) => handleExperienceChange(index, e)}
-                    placeholder="Briefly describe your responsibilities..."
-                    className="w-full p-3 border border-gray-300 rounded-lg h-24"
-                  />
-                </div>
-              </div>
-            ))}
+                </span>
+              ))}
+            </div>
           </div>
 
+          {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300"
+            disabled={isSubmitting}
+            className={`w-full font-bold py-2 rounded-md transition ${
+              isSubmitting
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
           >
-            Create Profile
+            {isSubmitting ? "Creating Profile..." : "Create Profile"}
           </button>
         </form>
       </div>

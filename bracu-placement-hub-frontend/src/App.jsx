@@ -1,41 +1,72 @@
 import React, { useState, useContext } from "react";
 import { AuthContext } from "./context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode"; // Import the decoder
+import { jwtDecode } from "jwt-decode";
 
 function App() {
   const [tempToken, setTempToken] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { loginAction } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const handleSimulateLogin = () => {
+  const handleSimulateLogin = async () => {
     if (!tempToken.trim()) {
       return alert("Please paste a token from Postman.");
     }
 
+    setIsLoading(true);
     try {
       // Decode the token to get the user's information
       const decodedUser = jwtDecode(tempToken);
-      console.log("DECODED TOKEN PAYLOAD:", decodedUser); // <-- ADD THIS LINE
+      console.log("DECODED TOKEN PAYLOAD:", decodedUser);
 
       // Create the data object our loginAction expects
       const loginData = {
         token: tempToken,
         user: {
-          userId: decodedUser.userId, // Get the REAL userId from the token
-          name: decodedUser.name || "User", // Use name from token if available
+          userId: decodedUser.userId,
+          name: decodedUser.name || "User",
         },
       };
 
+      // Store token and userId in context and localStorage
       loginAction(loginData);
-      alert("Token set successfully! Navigating to create profile...");
-      // Navigate to the correct page for the logged-in user
-      navigate(`/create-profile`);
+      localStorage.setItem("token", tempToken);
+      localStorage.setItem("userId", decodedUser.userId);
+
+      // Call the profile status endpoint to determine routing
+      const response = await fetch("http://localhost:1350/api/profile/status", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tempToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch profile status");
+      }
+
+      const data = await response.json();
+      console.log("Profile Status Response:", data);
+
+      // Smart routing based on profile status
+      if (data.hasProfile) {
+        // Existing user with complete profile
+        alert("Welcome back! Redirecting to your profile...");
+        navigate(`/profile/view/${decodedUser.userId}`);
+      } else {
+        // New user or incomplete profile
+        alert("Welcome! Let's create your profile...");
+        navigate("/create-profile");
+      }
     } catch (error) {
-      console.error("Invalid token:", error);
+      console.error("Login error:", error);
       alert(
-        "The token you pasted is invalid. Please get a fresh one from Postman."
+        "An error occurred during login. Please check your token and try again."
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -52,12 +83,18 @@ function App() {
             onChange={(e) => setTempToken(e.target.value)}
             placeholder="Paste your JWT token here"
             className="w-full p-2 border border-gray-300 rounded-md h-32"
+            disabled={isLoading}
           />
           <button
             onClick={handleSimulateLogin}
-            className="w-full bg-blue-600 text-white font-bold py-2 rounded-md hover:bg-blue-700"
+            disabled={isLoading}
+            className={`w-full font-bold py-2 rounded-md transition ${
+              isLoading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
           >
-            Set Token & Enter App
+            {isLoading ? "Processing..." : "Set Token & Enter App"}
           </button>
         </div>
       </div>
