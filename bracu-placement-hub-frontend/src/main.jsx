@@ -6,23 +6,55 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 // Import CSS
 import "./index.css";
 
-// Import Page Components
-import App from "./App.jsx";
+// Import Page Components - Authentication
+import App from "./App.jsx"; // Dev Login
+import LoginPage from "./pages/LoginPage.jsx";
+import RegisterPage from "./pages/RegisterPage.jsx";
+
+// Import Page Components - Student
 import CreateProfilePage from "./pages/CreateProfilePage.jsx";
 import ViewProfilePage from "./pages/ViewProfilePage.jsx";
 import EditProfilePage from "./pages/EditProfilePage.jsx";
-// NEW: Job-related pages
+
+// Import Page Components - Job Discovery
 import JobSearchPage from "./pages/JobSearchPage.jsx";
 import JobDetailsPage from "./pages/JobDetailsPage.jsx";
 import ApplicationConfirmPage from "./pages/ApplicationConfirmPage.jsx";
 import ApplicationSuccessPage from "./pages/ApplicationSuccessPage.jsx";
 
+// Import Page Components - Recruiter
+import RecruiterDashboard from "./pages/RecruiterDashboard.jsx";
+import CreateJobPage from "./pages/CreateJobPage.jsx";
+import EditJobPage from "./pages/EditJobPage.jsx";
+
+// Import Page Components - Admin
+import AdminDashboard from "./pages/AdminDashboard.jsx";
+
 // Create the router configuration
 const router = createBrowserRouter([
+  // ============================================
+  // AUTHENTICATION ROUTES
+  // ============================================
   {
     path: "/",
-    element: <App />, // Developer login page
+    element: <LoginPage />, // Main login page
   },
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />,
+  },
+  {
+    path: "/dev-login",
+    element: <App />, // Developer token login (for testing)
+  },
+
+  // ============================================
+  // STUDENT PROFILE ROUTES
+  // ============================================
   {
     path: "/create-profile",
     element: <CreateProfilePage />,
@@ -35,7 +67,10 @@ const router = createBrowserRouter([
     path: "/profile/edit",
     element: <EditProfilePage />,
   },
-  // NEW: Job Discovery & Application Routes
+
+  // ============================================
+  // JOB DISCOVERY & APPLICATION ROUTES (STUDENT)
+  // ============================================
   {
     path: "/jobs",
     element: <JobSearchPage />,
@@ -51,6 +86,30 @@ const router = createBrowserRouter([
   {
     path: "/jobs/:jobId/application-success",
     element: <ApplicationSuccessPage />,
+  },
+
+  // ============================================
+  // RECRUITER ROUTES
+  // ============================================
+  {
+    path: "/recruiter/dashboard",
+    element: <RecruiterDashboard />,
+  },
+  {
+    path: "/recruiter/jobs/create",
+    element: <CreateJobPage />,
+  },
+  {
+    path: "/recruiter/jobs/edit/:jobId",
+    element: <EditJobPage />,
+  },
+
+  // ============================================
+  // ADMIN ROUTES
+  // ============================================
+  {
+    path: "/admin/dashboard",
+    element: <AdminDashboard />,
   },
 ]);
 

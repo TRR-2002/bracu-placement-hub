@@ -31,6 +31,17 @@ const auth = (req, res, next) => {
   }
 };
 
+// NEW: Middleware to check if user is a recruiter
+const recruiterAuth = (req, res, next) => {
+  if (req.user.role !== "recruiter") {
+    return res.status(403).json({
+      success: false,
+      error: "Access denied. Recruiter role required.",
+    });
+  }
+  next();
+};
+
 // =================================================================
 // DATABASE CONNECTION
 // =================================================================
@@ -71,15 +82,15 @@ const UserSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 const User = mongoose.model("User", UserSchema);
 
-// UPDATED JOB SCHEMA - Added coordinates for map integration
+// UPDATED JOB SCHEMA - Added recruiter reference
 const JobSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     company: { type: String, required: true },
     location: String,
-    // NEW: Geographic coordinates for map display
     coordinates: {
       lat: { type: Number },
       lng: { type: Number },
@@ -98,12 +109,18 @@ const JobSchema = new mongoose.Schema(
       enum: ["Open", "Closed", "Filled"],
       default: "Open",
     },
+    // NEW: Track which recruiter posted this job
+    recruiter: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
   { timestamps: true }
 );
+
 const Job = mongoose.model("Job", JobSchema);
 
-// Application Schema with profile snapshot
 const ApplicationSchema = new mongoose.Schema(
   {
     job: { type: mongoose.Schema.Types.ObjectId, ref: "Job" },
@@ -134,6 +151,7 @@ const ApplicationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 const Application = mongoose.model("Application", ApplicationSchema);
 
 const NotificationSchema = new mongoose.Schema(
@@ -144,6 +162,7 @@ const NotificationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 const Notification = mongoose.model("Notification", NotificationSchema);
 
 const DashboardSchema = new mongoose.Schema({
@@ -155,6 +174,7 @@ const DashboardSchema = new mongoose.Schema({
   },
   savedJobs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Job" }],
 });
+
 const Dashboard = mongoose.model("Dashboard", DashboardSchema);
 
 // =================================================================
@@ -163,29 +183,48 @@ const Dashboard = mongoose.model("Dashboard", DashboardSchema);
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         error: "Name, email, and password are required",
       });
     }
-    if (!email.endsWith("@g.bracu.ac.bd")) {
-      return res.status(400).json({
-        success: false,
-        error: "Only @g.bracu.ac.bd email addresses are allowed",
-      });
+
+    // Role-specific email validation
+    if (role === "student" || !role) {
+      // Students must use @g.bracu.ac.bd
+      if (!email.endsWith("@g.bracu.ac.bd")) {
+        return res.status(400).json({
+          success: false,
+          error: "Students must use @g.bracu.ac.bd email addresses",
+        });
+      }
+    } else if (role === "recruiter" || role === "admin") {
+      // Recruiters and admins cannot use @g.bracu.ac.bd
+      if (email.endsWith("@g.bracu.ac.bd")) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "Recruiters and admins must use non-university email addresses",
+        });
+      }
     }
+
     let user = await User.findOne({ email });
     if (user) {
       return res
         .status(400)
         .json({ success: false, error: "User with this email already exists" });
     }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
     const userId = email.split("@")[0];
     user = new User({ name, userId, email, password: hashedPassword, role });
     await user.save();
+
     res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -199,27 +238,32 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+
     const user = await User.findOne({ email });
     if (!user) {
       return res
         .status(401)
         .json({ success: false, error: "Invalid email or password" });
     }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res
         .status(401)
         .json({ success: false, error: "Invalid email or password" });
     }
+
     const payload = {
       id: user.id,
       userId: user.userId,
       role: user.role,
       name: user.name,
     };
+
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "24h",
     });
+
     res.json({
       success: true,
       message: "Login successful",
@@ -253,12 +297,14 @@ app.get("/api/profile/status", auth, async (req, res) => {
         .status(404)
         .json({ success: false, error: "User not found", hasProfile: false });
     }
+
     const hasProfile = !!(
       user.skills &&
       user.skills.length > 0 &&
       user.interests &&
       user.interests.length > 0
     );
+
     res.json({ success: true, hasProfile, userId: user.userId });
   } catch (error) {
     res
@@ -275,14 +321,17 @@ app.put("/api/profile/:userId", auth, async (req, res) => {
         error: "Access denied. You can only update your own profile.",
       });
     }
+
     const updatedUser = await User.findOneAndUpdate(
       { _id: req.user.id },
       { $set: req.body },
       { new: true, runValidators: true }
     ).select("-password");
+
     if (!updatedUser) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
+
     res.json({
       success: true,
       message: "Profile updated successfully",
@@ -295,7 +344,7 @@ app.put("/api/profile/:userId", auth, async (req, res) => {
 });
 
 // =================================================================
-// FEATURE 02: JOB DISCOVERY & APPLICATION APIs
+// FEATURE 02: JOB DISCOVERY & APPLICATION APIs (STUDENT)
 // =================================================================
 
 // Search jobs with filters
@@ -319,6 +368,7 @@ app.get("/api/jobs/search", auth, async (req, res) => {
     if (minSalary) {
       query.salaryMin = { $gte: Number(minSalary) };
     }
+
     if (maxSalary) {
       query.salaryMax = { $lte: Number(maxSalary) };
     }
@@ -374,6 +424,7 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
       user: req.user.id,
       job: jobId,
     });
+
     if (existingApplication) {
       return res
         .status(400)
@@ -403,6 +454,7 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
       status: "Pending",
       profileSnapshot: profileSnapshot,
     });
+
     await newApplication.save();
 
     const notification = new Notification({
@@ -427,6 +479,7 @@ app.get("/api/applications/my-applications", auth, async (req, res) => {
     const applications = await Application.find({ user: req.user.id })
       .populate("job")
       .sort({ createdAt: -1 });
+
     res.json({ success: true, applications });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -434,16 +487,206 @@ app.get("/api/applications/my-applications", auth, async (req, res) => {
 });
 
 // =================================================================
+// NEW: RECRUITER JOB MANAGEMENT APIs
+// =================================================================
+
+// Get all jobs posted by the recruiter
+app.get("/api/recruiter/jobs", auth, recruiterAuth, async (req, res) => {
+  try {
+    const jobs = await Job.find({ recruiter: req.user.id }).sort({
+      createdAt: -1,
+    });
+
+    res.json({ success: true, jobs });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get single job details (recruiter view)
+app.get("/api/recruiter/jobs/:jobId", auth, recruiterAuth, async (req, res) => {
+  try {
+    const job = await Job.findOne({
+      _id: req.params.jobId,
+      recruiter: req.user.id,
+    });
+
+    if (!job) {
+      return res.status(404).json({ success: false, error: "Job not found" });
+    }
+
+    res.json({ success: true, job });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create new job posting
+app.post("/api/recruiter/jobs", auth, recruiterAuth, async (req, res) => {
+  try {
+    const jobData = {
+      ...req.body,
+      recruiter: req.user.id,
+      status: "Open",
+    };
+
+    const newJob = new Job(jobData);
+    await newJob.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Job posted successfully",
+      job: newJob,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update job posting
+app.put("/api/recruiter/jobs/:jobId", auth, recruiterAuth, async (req, res) => {
+  try {
+    const job = await Job.findOne({
+      _id: req.params.jobId,
+      recruiter: req.user.id,
+    });
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: "Job not found or you don't have permission to edit it",
+      });
+    }
+
+    const updatedJob = await Job.findByIdAndUpdate(
+      req.params.jobId,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      message: "Job updated successfully",
+      job: updatedJob,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete job posting
+app.delete(
+  "/api/recruiter/jobs/:jobId",
+  auth,
+  recruiterAuth,
+  async (req, res) => {
+    try {
+      const job = await Job.findOne({
+        _id: req.params.jobId,
+        recruiter: req.user.id,
+      });
+
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          error: "Job not found or you don't have permission to delete it",
+        });
+      }
+
+      await Job.findByIdAndDelete(req.params.jobId);
+
+      res.json({
+        success: true,
+        message: "Job deleted successfully",
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+// Mark job as filled
+app.patch(
+  "/api/recruiter/jobs/:jobId/mark-filled",
+  auth,
+  recruiterAuth,
+  async (req, res) => {
+    try {
+      const job = await Job.findOne({
+        _id: req.params.jobId,
+        recruiter: req.user.id,
+      });
+
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          error: "Job not found or you don't have permission to modify it",
+        });
+      }
+
+      job.status = "Filled";
+      await job.save();
+
+      res.json({
+        success: true,
+        message: "Job marked as filled",
+        job,
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+// Get applications for a specific job (recruiter view)
+app.get(
+  "/api/recruiter/jobs/:jobId/applications",
+  auth,
+  recruiterAuth,
+  async (req, res) => {
+    try {
+      const job = await Job.findOne({
+        _id: req.params.jobId,
+        recruiter: req.user.id,
+      });
+
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          error:
+            "Job not found or you don't have permission to view applications",
+        });
+      }
+
+      const applications = await Application.find({ job: req.params.jobId })
+        .populate("user", "name email")
+        .sort({ createdAt: -1 });
+
+      res.json({
+        success: true,
+        applications,
+        jobTitle: job.title,
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+// =================================================================
 // DASHBOARD APIs
 // =================================================================
+
 app.get("/api/dashboard/applications/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
+
     const applications = await Application.find({ user: req.user.id })
       .populate("job")
       .sort({ createdAt: -1 });
+
     res.json({ success: true, applications });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -455,9 +698,11 @@ app.get("/api/dashboard/notifications/:userId", auth, async (req, res) => {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
+
     const notifications = await Notification.find({ user: req.user.id }).sort({
       createdAt: -1,
     });
+
     res.json({ success: true, notifications });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -469,9 +714,11 @@ app.get("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
+
     const dashboard = await Dashboard.findOne({ user: req.user.id }).populate(
       "savedJobs"
     );
+
     res.json({
       success: true,
       savedJobs: dashboard ? dashboard.savedJobs : [],
@@ -486,12 +733,15 @@ app.post("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
+
     const { jobId } = req.body;
+
     const job = await Job.findById(jobId);
     if (!job)
       return res.status(404).json({ success: false, error: "Job not found" });
 
     let dashboard = await Dashboard.findOne({ user: req.user.id });
+
     if (!dashboard) {
       dashboard = new Dashboard({ user: req.user.id, savedJobs: [jobId] });
     } else {
@@ -502,6 +752,7 @@ app.post("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
       }
       dashboard.savedJobs.push(jobId);
     }
+
     await dashboard.save();
     res.json({ success: true, message: "Job saved successfully" });
   } catch (error) {
@@ -514,11 +765,14 @@ app.delete("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
+
     const { jobId } = req.body;
+
     await Dashboard.updateOne(
       { user: req.user.id },
       { $pull: { savedJobs: jobId } }
     );
+
     res.json({ success: true, message: "Job removed from saved" });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -530,6 +784,7 @@ app.get("/api/dashboard/:userId", auth, async (req, res) => {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
+
     const user = await User.findById(req.user.id).select("-password");
     if (!user)
       return res.status(404).json({ success: false, error: "User not found" });
@@ -569,10 +824,12 @@ app.get("/api/dashboard/:userId", auth, async (req, res) => {
 });
 
 // =================================================================
-// HELPER APIs FOR TESTING
+// HELPER APIs FOR TESTING (Keep for backward compatibility)
 // =================================================================
+
 app.post("/api/test/create-job", async (req, res) => {
   try {
+    // For testing, allow creating jobs without recruiter
     const job = new Job(req.body);
     await job.save();
     res.status(201).json({ success: true, message: "Test job created", job });
@@ -603,7 +860,8 @@ const PORT = 1350;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Student ID: 23101350`);
-  console.log(`Authentication: UPGRADED AND RUNNING!`);
+  console.log(`Authentication: UPGRADED WITH ROLE-BASED REGISTRATION!`);
   console.log(`Job Discovery & Application: READY!`);
+  console.log(`Recruiter Job Management: READY!`);
   console.log(`External API (Maps): READY FOR INTEGRATION!`);
 });
