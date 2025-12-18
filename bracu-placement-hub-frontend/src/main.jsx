@@ -30,6 +30,14 @@ import EditJobPage from "./pages/EditJobPage.jsx";
 // Import Page Components - Admin
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 
+// NEW: Import Page Components - Community Forum
+import ForumPage from "./pages/ForumPage.jsx";
+import CreateForumPostPage from "./pages/CreateForumPostPage.jsx";
+import ForumPostDetailsPage from "./pages/ForumPostDetailsPage.jsx";
+
+// NEW: Import Page Components - Enhanced Dashboard
+import EnhancedDashboardPage from "./pages/EnhancedDashboardPage.jsx";
+
 // Create the router configuration
 const router = createBrowserRouter([
   // ============================================
@@ -37,7 +45,7 @@ const router = createBrowserRouter([
   // ============================================
   {
     path: "/",
-    element: <LoginPage />, // Main login page
+    element: <LoginPage />,
   },
   {
     path: "/login",
@@ -49,7 +57,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/dev-login",
-    element: <App />, // Developer token login (for testing)
+    element: <App />,
   },
 
   // ============================================
@@ -69,7 +77,7 @@ const router = createBrowserRouter([
   },
 
   // ============================================
-  // JOB DISCOVERY & APPLICATION ROUTES (STUDENT)
+  // JOB DISCOVERY & APPLICATION ROUTES
   // ============================================
   {
     path: "/jobs",
@@ -110,6 +118,30 @@ const router = createBrowserRouter([
   {
     path: "/admin/dashboard",
     element: <AdminDashboard />,
+  },
+
+  // ============================================
+  // NEW: COMMUNITY FORUM ROUTES
+  // ============================================
+  {
+    path: "/forum",
+    element: <ForumPage />,
+  },
+  {
+    path: "/forum/create",
+    element: <CreateForumPostPage />,
+  },
+  {
+    path: "/forum/posts/:postId",
+    element: <ForumPostDetailsPage />,
+  },
+
+  // ============================================
+  // NEW: ENHANCED DASHBOARD ROUTE
+  // ============================================
+  {
+    path: "/dashboard/:userId",
+    element: <EnhancedDashboardPage />,
   },
 ]);
 

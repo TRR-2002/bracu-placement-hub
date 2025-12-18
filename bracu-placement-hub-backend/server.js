@@ -31,7 +31,6 @@ const auth = (req, res, next) => {
   }
 };
 
-// NEW: Middleware to check if user is a recruiter
 const recruiterAuth = (req, res, next) => {
   if (req.user.role !== "recruiter") {
     return res.status(403).json({
@@ -54,6 +53,8 @@ mongoose
 // =================================================================
 // MONGOOSE SCHEMAS & MODELS
 // =================================================================
+
+// USER SCHEMA
 const UserSchema = new mongoose.Schema(
   {
     userId: { type: String, required: true, unique: true },
@@ -79,13 +80,15 @@ const UserSchema = new mongoose.Schema(
       },
     ],
     education: [{ institution: String, degree: String, year: String }],
+    // NEW: Connected users for dashboard
+    connections: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );
 
 const User = mongoose.model("User", UserSchema);
 
-// UPDATED JOB SCHEMA - Added recruiter reference
+// JOB SCHEMA
 const JobSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
@@ -109,7 +112,6 @@ const JobSchema = new mongoose.Schema(
       enum: ["Open", "Closed", "Filled"],
       default: "Open",
     },
-    // NEW: Track which recruiter posted this job
     recruiter: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -121,6 +123,7 @@ const JobSchema = new mongoose.Schema(
 
 const Job = mongoose.model("Job", JobSchema);
 
+// APPLICATION SCHEMA
 const ApplicationSchema = new mongoose.Schema(
   {
     job: { type: mongoose.Schema.Types.ObjectId, ref: "Job" },
@@ -154,17 +157,25 @@ const ApplicationSchema = new mongoose.Schema(
 
 const Application = mongoose.model("Application", ApplicationSchema);
 
+// NOTIFICATION SCHEMA
 const NotificationSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     message: { type: String, required: true },
     read: { type: Boolean, default: false },
+    type: {
+      type: String,
+      enum: ["application", "forum", "connection", "system"],
+      default: "system",
+    },
+    link: String, // URL to navigate to when clicked
   },
   { timestamps: true }
 );
 
 const Notification = mongoose.model("Notification", NotificationSchema);
 
+// DASHBOARD SCHEMA
 const DashboardSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -177,9 +188,63 @@ const DashboardSchema = new mongoose.Schema({
 
 const Dashboard = mongoose.model("Dashboard", DashboardSchema);
 
+// NEW: FORUM POST SCHEMA
+const ForumPostSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    content: { type: String, required: true },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    category: {
+      type: String,
+      enum: [
+        "Interview Tips",
+        "Job Seeking",
+        "Career Advice",
+        "Networking",
+        "General Discussion",
+        "Company Reviews",
+      ],
+      default: "General Discussion",
+    },
+    tags: [String],
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    views: { type: Number, default: 0 },
+    isPinned: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+const ForumPost = mongoose.model("ForumPost", ForumPostSchema);
+
+// NEW: FORUM COMMENT SCHEMA
+const ForumCommentSchema = new mongoose.Schema(
+  {
+    post: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ForumPost",
+      required: true,
+    },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    content: { type: String, required: true },
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  },
+  { timestamps: true }
+);
+
+const ForumComment = mongoose.model("ForumComment", ForumCommentSchema);
+
 // =================================================================
 // AUTHENTICATION APIs
 // =================================================================
+
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -191,9 +256,7 @@ app.post("/api/auth/register", async (req, res) => {
       });
     }
 
-    // Role-specific email validation
     if (role === "student" || !role) {
-      // Students must use @g.bracu.ac.bd
       if (!email.endsWith("@g.bracu.ac.bd")) {
         return res.status(400).json({
           success: false,
@@ -201,7 +264,6 @@ app.post("/api/auth/register", async (req, res) => {
         });
       }
     } else if (role === "recruiter" || role === "admin") {
-      // Recruiters and admins cannot use @g.bracu.ac.bd
       if (email.endsWith("@g.bracu.ac.bd")) {
         return res.status(400).json({
           success: false,
@@ -344,10 +406,9 @@ app.put("/api/profile/:userId", auth, async (req, res) => {
 });
 
 // =================================================================
-// FEATURE 02: JOB DISCOVERY & APPLICATION APIs (STUDENT)
+// JOB DISCOVERY & APPLICATION APIs
 // =================================================================
 
-// Search jobs with filters
 app.get("/api/jobs/search", auth, async (req, res) => {
   try {
     const { keyword, location, minSalary, maxSalary } = req.query;
@@ -380,7 +441,6 @@ app.get("/api/jobs/search", auth, async (req, res) => {
   }
 });
 
-// Get single job details
 app.get("/api/jobs/:jobId", auth, async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
@@ -403,7 +463,6 @@ app.get("/api/jobs/:jobId", auth, async (req, res) => {
   }
 });
 
-// Apply to job with profile snapshot
 app.post("/api/jobs/apply", auth, async (req, res) => {
   try {
     const { jobId } = req.body;
@@ -460,6 +519,8 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
     const notification = new Notification({
       user: req.user.id,
       message: `Your application for "${job.title}" at ${job.company} has been submitted successfully.`,
+      type: "application",
+      link: `/jobs/${jobId}`,
     });
     await notification.save();
 
@@ -473,7 +534,6 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
   }
 });
 
-// Get user's applications
 app.get("/api/applications/my-applications", auth, async (req, res) => {
   try {
     const applications = await Application.find({ user: req.user.id })
@@ -487,10 +547,9 @@ app.get("/api/applications/my-applications", auth, async (req, res) => {
 });
 
 // =================================================================
-// NEW: RECRUITER JOB MANAGEMENT APIs
+// RECRUITER JOB MANAGEMENT APIs
 // =================================================================
 
-// Get all jobs posted by the recruiter
 app.get("/api/recruiter/jobs", auth, recruiterAuth, async (req, res) => {
   try {
     const jobs = await Job.find({ recruiter: req.user.id }).sort({
@@ -503,7 +562,6 @@ app.get("/api/recruiter/jobs", auth, recruiterAuth, async (req, res) => {
   }
 });
 
-// Get single job details (recruiter view)
 app.get("/api/recruiter/jobs/:jobId", auth, recruiterAuth, async (req, res) => {
   try {
     const job = await Job.findOne({
@@ -521,7 +579,6 @@ app.get("/api/recruiter/jobs/:jobId", auth, recruiterAuth, async (req, res) => {
   }
 });
 
-// Create new job posting
 app.post("/api/recruiter/jobs", auth, recruiterAuth, async (req, res) => {
   try {
     const jobData = {
@@ -543,7 +600,6 @@ app.post("/api/recruiter/jobs", auth, recruiterAuth, async (req, res) => {
   }
 });
 
-// Update job posting
 app.put("/api/recruiter/jobs/:jobId", auth, recruiterAuth, async (req, res) => {
   try {
     const job = await Job.findOne({
@@ -574,7 +630,6 @@ app.put("/api/recruiter/jobs/:jobId", auth, recruiterAuth, async (req, res) => {
   }
 });
 
-// Delete job posting
 app.delete(
   "/api/recruiter/jobs/:jobId",
   auth,
@@ -605,7 +660,6 @@ app.delete(
   }
 );
 
-// Mark job as filled
 app.patch(
   "/api/recruiter/jobs/:jobId/mark-filled",
   auth,
@@ -638,7 +692,6 @@ app.patch(
   }
 );
 
-// Get applications for a specific job (recruiter view)
 app.get(
   "/api/recruiter/jobs/:jobId/applications",
   auth,
@@ -674,9 +727,510 @@ app.get(
 );
 
 // =================================================================
-// DASHBOARD APIs
+// NEW: COMMUNITY FORUM APIs
 // =================================================================
 
+// Get all forum posts with filters
+app.get("/api/forum/posts", auth, async (req, res) => {
+  try {
+    const { category, search, sortBy = "createdAt" } = req.query;
+    let query = {};
+
+    if (category && category !== "All") {
+      query.category = category;
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { content: { $regex: search, $options: "i" } },
+        { tags: { $in: [new RegExp(search, "i")] } },
+      ];
+    }
+
+    let sortOptions = {};
+    if (sortBy === "likes") {
+      // Sort by number of likes (descending)
+      sortOptions = { "likes.length": -1, createdAt: -1 };
+    } else if (sortBy === "views") {
+      sortOptions = { views: -1, createdAt: -1 };
+    } else {
+      sortOptions = { isPinned: -1, createdAt: -1 };
+    }
+
+    const posts = await ForumPost.find(query)
+      .populate("author", "name email department")
+      .sort(sortOptions)
+      .lean();
+
+    // Add like count and comment count to each post
+    const postsWithCounts = await Promise.all(
+      posts.map(async (post) => {
+        const commentCount = await ForumComment.countDocuments({
+          post: post._id,
+        });
+        return {
+          ...post,
+          likeCount: post.likes.length,
+          commentCount,
+          isLiked: post.likes.some(
+            (like) => like.toString() === req.user.id.toString()
+          ),
+        };
+      })
+    );
+
+    res.json({ success: true, posts: postsWithCounts });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get single forum post with comments
+app.get("/api/forum/posts/:postId", auth, async (req, res) => {
+  try {
+    const post = await ForumPost.findById(req.params.postId)
+      .populate("author", "name email department studentId")
+      .lean();
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+
+    // Increment view count
+    await ForumPost.findByIdAndUpdate(req.params.postId, {
+      $inc: { views: 1 },
+    });
+
+    // Get comments
+    const comments = await ForumComment.find({ post: req.params.postId })
+      .populate("author", "name email department")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    // Add like info to comments
+    const commentsWithLikes = comments.map((comment) => ({
+      ...comment,
+      likeCount: comment.likes.length,
+      isLiked: comment.likes.some(
+        (like) => like.toString() === req.user.id.toString()
+      ),
+    }));
+
+    res.json({
+      success: true,
+      post: {
+        ...post,
+        likeCount: post.likes.length,
+        commentCount: comments.length,
+        isLiked: post.likes.some(
+          (like) => like.toString() === req.user.id.toString()
+        ),
+      },
+      comments: commentsWithLikes,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create new forum post
+app.post("/api/forum/posts", auth, async (req, res) => {
+  try {
+    const { title, content, category, tags } = req.body;
+
+    if (!title || !content) {
+      return res.status(400).json({
+        success: false,
+        error: "Title and content are required",
+      });
+    }
+
+    const newPost = new ForumPost({
+      title,
+      content,
+      category: category || "General Discussion",
+      tags: tags || [],
+      author: req.user.id,
+    });
+
+    await newPost.save();
+
+    const populatedPost = await ForumPost.findById(newPost._id).populate(
+      "author",
+      "name email department"
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Post created successfully",
+      post: populatedPost,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update forum post
+app.put("/api/forum/posts/:postId", auth, async (req, res) => {
+  try {
+    const post = await ForumPost.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+
+    // Check if user is the author
+    if (post.author.toString() !== req.user.id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: "You can only edit your own posts",
+      });
+    }
+
+    const { title, content, category, tags } = req.body;
+
+    const updatedPost = await ForumPost.findByIdAndUpdate(
+      req.params.postId,
+      { title, content, category, tags },
+      { new: true }
+    ).populate("author", "name email department");
+
+    res.json({
+      success: true,
+      message: "Post updated successfully",
+      post: updatedPost,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete forum post
+app.delete("/api/forum/posts/:postId", auth, async (req, res) => {
+  try {
+    const post = await ForumPost.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+
+    // Check if user is the author
+    if (post.author.toString() !== req.user.id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: "You can only delete your own posts",
+      });
+    }
+
+    // Delete all comments on this post
+    await ForumComment.deleteMany({ post: req.params.postId });
+
+    // Delete the post
+    await ForumPost.findByIdAndDelete(req.params.postId);
+
+    res.json({
+      success: true,
+      message: "Post deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Like/Unlike a forum post
+app.post("/api/forum/posts/:postId/like", auth, async (req, res) => {
+  try {
+    const post = await ForumPost.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+
+    const userLikeIndex = post.likes.indexOf(req.user.id);
+
+    if (userLikeIndex > -1) {
+      // User already liked, so unlike
+      post.likes.splice(userLikeIndex, 1);
+      await post.save();
+
+      res.json({
+        success: true,
+        message: "Post unliked",
+        likeCount: post.likes.length,
+        isLiked: false,
+      });
+    } else {
+      // User hasn't liked, so like
+      post.likes.push(req.user.id);
+      await post.save();
+
+      // Create notification for post author (if not self-like)
+      if (post.author.toString() !== req.user.id.toString()) {
+        const notification = new Notification({
+          user: post.author,
+          message: `${req.user.name} liked your post: "${post.title}"`,
+          type: "forum",
+          link: `/forum/posts/${post._id}`,
+        });
+        await notification.save();
+      }
+
+      res.json({
+        success: true,
+        message: "Post liked",
+        likeCount: post.likes.length,
+        isLiked: true,
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Add comment to forum post
+app.post("/api/forum/posts/:postId/comments", auth, async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        error: "Comment content is required",
+      });
+    }
+
+    const post = await ForumPost.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+
+    const newComment = new ForumComment({
+      post: req.params.postId,
+      author: req.user.id,
+      content,
+    });
+
+    await newComment.save();
+
+    const populatedComment = await ForumComment.findById(newComment._id)
+      .populate("author", "name email department")
+      .lean();
+
+    // Create notification for post author (if not commenting on own post)
+    if (post.author.toString() !== req.user.id.toString()) {
+      const notification = new Notification({
+        user: post.author,
+        message: `${req.user.name} commented on your post: "${post.title}"`,
+        type: "forum",
+        link: `/forum/posts/${post._id}`,
+      });
+      await notification.save();
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Comment added successfully",
+      comment: {
+        ...populatedComment,
+        likeCount: 0,
+        isLiked: false,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Like/Unlike a comment
+app.post("/api/forum/comments/:commentId/like", auth, async (req, res) => {
+  try {
+    const comment = await ForumComment.findById(req.params.commentId);
+
+    if (!comment) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Comment not found" });
+    }
+
+    const userLikeIndex = comment.likes.indexOf(req.user.id);
+
+    if (userLikeIndex > -1) {
+      // Unlike
+      comment.likes.splice(userLikeIndex, 1);
+      await comment.save();
+
+      res.json({
+        success: true,
+        message: "Comment unliked",
+        likeCount: comment.likes.length,
+        isLiked: false,
+      });
+    } else {
+      // Like
+      comment.likes.push(req.user.id);
+      await comment.save();
+
+      // Create notification for comment author
+      if (comment.author.toString() !== req.user.id.toString()) {
+        const notification = new Notification({
+          user: comment.author,
+          message: `${req.user.name} liked your comment`,
+          type: "forum",
+          link: `/forum/posts/${comment.post}`,
+        });
+        await notification.save();
+      }
+
+      res.json({
+        success: true,
+        message: "Comment liked",
+        likeCount: comment.likes.length,
+        isLiked: true,
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete comment
+app.delete("/api/forum/comments/:commentId", auth, async (req, res) => {
+  try {
+    const comment = await ForumComment.findById(req.params.commentId);
+
+    if (!comment) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Comment not found" });
+    }
+
+    // Check if user is the author
+    if (comment.author.toString() !== req.user.id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: "You can only delete your own comments",
+      });
+    }
+
+    await ForumComment.findByIdAndDelete(req.params.commentId);
+
+    res.json({
+      success: true,
+      message: "Comment deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// =================================================================
+// NEW: ENHANCED PERSONALIZED DASHBOARD APIs
+// =================================================================
+
+// Get comprehensive dashboard data
+app.get("/api/dashboard/:userId", auth, async (req, res) => {
+  try {
+    if (req.user.userId !== req.params.userId) {
+      return res.status(403).json({ success: false, error: "Access denied." });
+    }
+
+    const user = await User.findById(req.user.id)
+      .select("-password")
+      .populate("connections", "name email department");
+
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+
+    // Get applications with job details
+    const applications = await Application.find({ user: user.id })
+      .populate("job")
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Get application statistics
+    const applicationStats = {
+      total: await Application.countDocuments({ user: user.id }),
+      pending: await Application.countDocuments({
+        user: user.id,
+        status: "Pending",
+      }),
+      reviewed: await Application.countDocuments({
+        user: user.id,
+        status: "Reviewed",
+      }),
+      accepted: await Application.countDocuments({
+        user: user.id,
+        status: "Accepted",
+      }),
+      rejected: await Application.countDocuments({
+        user: user.id,
+        status: "Rejected",
+      }),
+    };
+
+    // Get saved jobs
+    const dashboard = await Dashboard.findOne({ user: user.id }).populate(
+      "savedJobs"
+    );
+
+    // Get recent notifications (unread first)
+    const notifications = await Notification.find({ user: user.id })
+      .sort({ read: 1, createdAt: -1 })
+      .limit(10);
+
+    const unreadNotificationCount = await Notification.countDocuments({
+      user: user.id,
+      read: false,
+    });
+
+    // Get user's recent forum posts
+    const recentPosts = await ForumPost.find({ author: user.id })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
+
+    const postsWithCounts = await Promise.all(
+      recentPosts.map(async (post) => {
+        const commentCount = await ForumComment.countDocuments({
+          post: post._id,
+        });
+        return {
+          ...post,
+          likeCount: post.likes.length,
+          commentCount,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        userId: user.userId,
+        studentInfo: {
+          name: user.name,
+          email: user.email,
+          department: user.department,
+          cgpa: user.cgpa,
+        },
+        applications: applications,
+        applicationStats: applicationStats,
+        savedJobsCount: dashboard ? dashboard.savedJobs.length : 0,
+        savedJobs: dashboard ? dashboard.savedJobs : [],
+        notifications: notifications,
+        unreadNotificationCount: unreadNotificationCount,
+        connections: user.connections || [],
+        connectionCount: user.connections ? user.connections.length : 0,
+        recentForumPosts: postsWithCounts,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get user's applications for dashboard
 app.get("/api/dashboard/applications/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -693,6 +1247,7 @@ app.get("/api/dashboard/applications/:userId", auth, async (req, res) => {
   }
 });
 
+// Get user's notifications
 app.get("/api/dashboard/notifications/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -709,6 +1264,65 @@ app.get("/api/dashboard/notifications/:userId", auth, async (req, res) => {
   }
 });
 
+// Mark notification as read
+app.patch(
+  "/api/dashboard/notifications/:notificationId/read",
+  auth,
+  async (req, res) => {
+    try {
+      const notification = await Notification.findById(
+        req.params.notificationId
+      );
+
+      if (!notification) {
+        return res.status(404).json({
+          success: false,
+          error: "Notification not found",
+        });
+      }
+
+      if (notification.user.toString() !== req.user.id.toString()) {
+        return res.status(403).json({
+          success: false,
+          error: "Access denied",
+        });
+      }
+
+      notification.read = true;
+      await notification.save();
+
+      res.json({
+        success: true,
+        message: "Notification marked as read",
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+// Mark all notifications as read
+app.patch(
+  "/api/dashboard/notifications/mark-all-read",
+  auth,
+  async (req, res) => {
+    try {
+      await Notification.updateMany(
+        { user: req.user.id, read: false },
+        { $set: { read: true } }
+      );
+
+      res.json({
+        success: true,
+        message: "All notifications marked as read",
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+// Get saved jobs
 app.get("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -728,6 +1342,7 @@ app.get("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   }
 });
 
+// Save a job
 app.post("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -760,6 +1375,7 @@ app.post("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   }
 });
 
+// Remove saved job
 app.delete("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
@@ -779,44 +1395,153 @@ app.delete("/api/dashboard/saved-jobs/:userId", auth, async (req, res) => {
   }
 });
 
-app.get("/api/dashboard/:userId", auth, async (req, res) => {
+// NEW: User Connections APIs
+
+// Get user's connections
+app.get("/api/dashboard/connections/:userId", auth, async (req, res) => {
   try {
     if (req.user.userId !== req.params.userId) {
       return res.status(403).json({ success: false, error: "Access denied." });
     }
 
-    const user = await User.findById(req.user.id).select("-password");
-    if (!user)
-      return res.status(404).json({ success: false, error: "User not found" });
-
-    const applications = await Application.find({ user: user.id })
-      .populate("job")
-      .sort({ createdAt: -1 })
-      .limit(5);
-
-    const dashboard = await Dashboard.findOne({ user: user.id }).populate(
-      "savedJobs"
+    const user = await User.findById(req.user.id).populate(
+      "connections",
+      "name email department studentId"
     );
-
-    const notifications = await Notification.find({ user: user.id })
-      .sort({ createdAt: -1 })
-      .limit(5);
 
     res.json({
       success: true,
-      data: {
-        userId: user.userId,
-        studentInfo: {
-          name: user.name,
-          email: user.email,
-          department: user.department,
-          cgpa: user.cgpa,
-        },
-        applications,
-        savedJobsCount: dashboard ? dashboard.savedJobs.length : 0,
-        savedJobs: dashboard ? dashboard.savedJobs : [],
-        notifications,
-      },
+      connections: user.connections || [],
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Add connection
+app.post("/api/dashboard/connections/add", auth, async (req, res) => {
+  try {
+    const { userId } = req.body; // ID of user to connect with
+
+    if (userId === req.user.id) {
+      return res.status(400).json({
+        success: false,
+        error: "You cannot connect with yourself",
+      });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    const currentUser = await User.findById(req.user.id);
+
+    if (currentUser.connections.includes(userId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Already connected with this user",
+      });
+    }
+
+    // Add to both users' connections
+    currentUser.connections.push(userId);
+    targetUser.connections.push(req.user.id);
+
+    await currentUser.save();
+    await targetUser.save();
+
+    // Create notification for target user
+    const notification = new Notification({
+      user: userId,
+      message: `${currentUser.name} connected with you`,
+      type: "connection",
+      link: `/profile/view/${currentUser.userId}`,
+    });
+    await notification.save();
+
+    res.json({
+      success: true,
+      message: "Connection added successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Remove connection
+app.post("/api/dashboard/connections/remove", auth, async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    const currentUser = await User.findById(req.user.id);
+    const targetUser = await User.findById(userId);
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Remove from both users' connections
+    currentUser.connections = currentUser.connections.filter(
+      (conn) => conn.toString() !== userId
+    );
+    targetUser.connections = targetUser.connections.filter(
+      (conn) => conn.toString() !== req.user.id
+    );
+
+    await currentUser.save();
+    await targetUser.save();
+
+    res.json({
+      success: true,
+      message: "Connection removed successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Search users to connect
+app.get("/api/users/search", auth, async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: "Search query must be at least 2 characters",
+      });
+    }
+
+    const users = await User.find({
+      _id: { $ne: req.user.id }, // Exclude current user
+      $or: [
+        { name: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } },
+        { department: { $regex: query, $options: "i" } },
+      ],
+    })
+      .select("name email department studentId")
+      .limit(20);
+
+    // Check which users are already connected
+    const currentUser = await User.findById(req.user.id);
+    const usersWithConnectionStatus = users.map((user) => ({
+      ...user.toObject(),
+      isConnected: currentUser.connections.some(
+        (conn) => conn.toString() === user._id.toString()
+      ),
+    }));
+
+    res.json({
+      success: true,
+      users: usersWithConnectionStatus,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -824,12 +1549,11 @@ app.get("/api/dashboard/:userId", auth, async (req, res) => {
 });
 
 // =================================================================
-// HELPER APIs FOR TESTING (Keep for backward compatibility)
+// HELPER APIs FOR TESTING
 // =================================================================
 
 app.post("/api/test/create-job", async (req, res) => {
   try {
-    // For testing, allow creating jobs without recruiter
     const job = new Job(req.body);
     await job.save();
     res.status(201).json({ success: true, message: "Test job created", job });
@@ -860,8 +1584,9 @@ const PORT = 1350;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Student ID: 23101350`);
-  console.log(`Authentication: UPGRADED WITH ROLE-BASED REGISTRATION!`);
+  console.log(`Authentication: UPGRADED AND RUNNING!`);
   console.log(`Job Discovery & Application: READY!`);
-  console.log(`Recruiter Job Management: READY!`);
+  console.log(`Community Forum: READY!`);
+  console.log(`Personalized Dashboard: ENHANCED AND READY!`);
   console.log(`External API (Maps): READY FOR INTEGRATION!`);
 });
