@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 function EnhancedDashboardPage() {
@@ -9,11 +9,18 @@ function EnhancedDashboardPage() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
-  // FIXED: Wrapped fetchDashboardData in useCallback
-  const fetchDashboardData = useCallback(async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError("");
       const token = localStorage.getItem("token");
+
+      if (!token) {
+        setError("Please login to view your dashboard.");
+        setTimeout(() => navigate("/login"), 2000);
+        return;
+      }
+
       const response = await fetch(
         `http://localhost:1350/api/dashboard/${userId}`,
         {
@@ -21,22 +28,34 @@ function EnhancedDashboardPage() {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to fetch dashboard data");
+      if (!response.ok) {
+        if (response.status === 403) {
+          setError("Access Denied: You can only view your own dashboard.");
+        } else {
+          throw new Error("Failed to fetch dashboard data from server.");
+        }
+        return;
+      }
 
       const data = await response.json();
-      setDashboardData(data.data);
+      if (data.success && data.data) {
+        setDashboardData(data.data);
+      } else {
+        throw new Error(
+          "Dashboard data format received from server is incorrect."
+        );
+      }
     } catch (err) {
-      console.error("Error:", err);
-      setError("Failed to load dashboard");
+      console.error("Dashboard fetch error:", err);
+      setError(err.message || "Failed to load dashboard.");
     } finally {
       setLoading(false);
     }
-  }, [userId]); // FIXED: Added userId as dependency
+  };
 
-  // FIXED: Added fetchDashboardData to dependency array
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData]);
+  }, [userId]);
 
   const handleMarkAllRead = async () => {
     try {
@@ -50,7 +69,7 @@ function EnhancedDashboardPage() {
       );
       fetchDashboardData();
     } catch (err) {
-      console.error("Error:", err);
+      console.error("Error marking notifications as read:", err);
     }
   };
 
@@ -80,7 +99,18 @@ function EnhancedDashboardPage() {
   if (error || !dashboardData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-red-600 text-xl">{error}</p>
+        <div className="text-center p-8 bg-white shadow-md rounded-lg max-w-sm w-full">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-700 mb-6">
+            {error || "Could not load dashboard data."}
+          </p>
+          <button
+            onClick={fetchDashboardData}
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
@@ -88,7 +118,6 @@ function EnhancedDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -108,7 +137,6 @@ function EnhancedDashboardPage() {
             </button>
           </div>
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h3 className="text-gray-600 font-semibold mb-2">
@@ -139,7 +167,6 @@ function EnhancedDashboardPage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="mb-6">
           <div className="flex gap-2 border-b">
             {[
@@ -170,12 +197,9 @@ function EnhancedDashboardPage() {
           </div>
         </div>
 
-        {/* Tab Content */}
         <div>
-          {/* Overview Tab */}
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Applications */}
               <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
                   Recent Applications
@@ -224,7 +248,6 @@ function EnhancedDashboardPage() {
                 </button>
               </div>
 
-              {/* Recent Forum Posts */}
               <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
                   Your Recent Forum Posts
@@ -263,7 +286,6 @@ function EnhancedDashboardPage() {
             </div>
           )}
 
-          {/* Applications Tab */}
           {activeTab === "applications" && (
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">
@@ -323,7 +345,6 @@ function EnhancedDashboardPage() {
             </div>
           )}
 
-          {/* Notifications Tab */}
           {activeTab === "notifications" && (
             <div className="bg-white p-6 rounded-lg shadow-md">
               <div className="flex justify-between items-center mb-4">
@@ -363,46 +384,44 @@ function EnhancedDashboardPage() {
             </div>
           )}
 
-          {/* Forum Tab */}
           {activeTab === "forum" && (
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">
                 Your Forum Activity
               </h2>
-              <div className="space-y-4">
-                {dashboardData.recentForumPosts.map((post) => (
-                  <div
-                    key={post._id}
-                    className="p-6 border rounded-lg hover:shadow-md transition cursor-pointer"
-                    onClick={() => navigate(`/forum/posts/${post._id}`)}
-                  >
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">
-                      {post.title}
-                    </h3>
-                    <div className="flex items-center gap-6 text-sm text-gray-600">
-                      <span className="flex items-center gap-1">
-                        <span>❤️</span> {post.likeCount} likes
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span>💬</span> {post.commentCount} comments
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span>👁</span> {post.views} views
-                      </span>
+              {dashboardData.recentForumPosts.length === 0 ? (
+                <p className="text-center py-8 text-gray-600">
+                  You haven't posted anything yet.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {dashboardData.recentForumPosts.map((post) => (
+                    <div
+                      key={post._id}
+                      className="p-6 border rounded-lg hover:shadow-md transition cursor-pointer"
+                      onClick={() => navigate(`/forum/posts/${post._id}`)}
+                    >
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">
+                        {post.title}
+                      </h3>
+                      <div className="flex items-center gap-6 text-sm text-gray-600">
+                        <span>❤️ {post.likeCount} likes</span>
+                        <span>💬 {post.commentCount} comments</span>
+                        <span>👁 {post.views} views</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                <button
-                  onClick={() => navigate("/forum")}
-                  className="w-full py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
-                >
-                  Go to Forum
-                </button>
-              </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => navigate("/forum")}
+                className="mt-4 w-full py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
+              >
+                Go to Forum
+              </button>
             </div>
           )}
 
-          {/* Connections Tab */}
           {activeTab === "connections" && (
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">

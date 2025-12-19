@@ -239,31 +239,25 @@ app.post("/api/auth/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     if (!name || !email || !password) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "Name, email, and password are required",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "Name, email, and password are required",
+      });
     }
     if (role === "student" || !role) {
       if (!email.endsWith("@g.bracu.ac.bd")) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error: "Students must use @g.bracu.ac.bd email addresses",
-          });
+        return res.status(400).json({
+          success: false,
+          error: "Students must use @g.bracu.ac.bd email addresses",
+        });
       }
     } else if (role === "recruiter" || role === "admin") {
       if (email.endsWith("@g.bracu.ac.bd")) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error:
-              "Recruiters and admins must use non-university email addresses",
-          });
+        return res.status(400).json({
+          success: false,
+          error:
+            "Recruiters and admins must use non-university email addresses",
+        });
       }
     }
     let user = await User.findOne({ email });
@@ -277,13 +271,11 @@ app.post("/api/auth/register", async (req, res) => {
     const userId = email.split("@")[0];
     user = new User({ name, userId, email, password: hashedPassword, role });
     await user.save();
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "User registered successfully",
-        userId: user.userId,
-      });
+    res.status(201).json({
+      success: true,
+      message: "User registered successfully",
+      userId: user.userId,
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -384,12 +376,10 @@ app.put("/api/profile/:userId", auth, async (req, res) => {
   // ... (existing code is correct)
   try {
     if (req.user.userId !== req.params.userId) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          error: "Access denied. You can only update your own profile.",
-        });
+      return res.status(403).json({
+        success: false,
+        error: "Access denied. You can only update your own profile.",
+      });
     }
     const updatedUser = await User.findOneAndUpdate(
       { _id: req.user.id },
@@ -477,12 +467,10 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
       return res.status(404).json({ success: false, error: "Job not found" });
     }
     if (job.status !== "Open") {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "This job is no longer accepting applications",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "This job is no longer accepting applications",
+      });
     }
     const existingApplication = await Application.findOne({
       user: req.user.id,
@@ -522,13 +510,11 @@ app.post("/api/jobs/apply", auth, async (req, res) => {
       link: `/jobs/${jobId}`,
     });
     await notification.save();
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Application submitted successfully",
-        application: newApplication,
-      });
+    res.status(201).json({
+      success: true,
+      message: "Application submitted successfully",
+      application: newApplication,
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -593,12 +579,10 @@ app.put("/api/recruiter/jobs/:jobId", auth, recruiterAuth, async (req, res) => {
       recruiter: req.user.id,
     });
     if (!job) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          error: "Job not found or you don't have permission to edit it",
-        });
+      return res.status(404).json({
+        success: false,
+        error: "Job not found or you don't have permission to edit it",
+      });
     }
     const updatedJob = await Job.findByIdAndUpdate(
       req.params.jobId,
@@ -625,12 +609,10 @@ app.delete(
         recruiter: req.user.id,
       });
       if (!job) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            error: "Job not found or you don't have permission to delete it",
-          });
+        return res.status(404).json({
+          success: false,
+          error: "Job not found or you don't have permission to delete it",
+        });
       }
       await Job.findByIdAndDelete(req.params.jobId);
       res.json({ success: true, message: "Job deleted successfully" });
@@ -650,12 +632,10 @@ app.patch(
         recruiter: req.user.id,
       });
       if (!job) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            error: "Job not found or you don't have permission to modify it",
-          });
+        return res.status(404).json({
+          success: false,
+          error: "Job not found or you don't have permission to modify it",
+        });
       }
       job.status = "Filled";
       await job.save();
@@ -676,13 +656,11 @@ app.get(
         recruiter: req.user.id,
       });
       if (!job) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            error:
-              "Job not found or you don't have permission to view applications",
-          });
+        return res.status(404).json({
+          success: false,
+          error:
+            "Job not found or you don't have permission to view applications",
+        });
       }
       const applications = await Application.find({ job: req.params.jobId })
         .populate("user", "name email")
@@ -802,13 +780,11 @@ app.post("/api/forum/posts", auth, async (req, res) => {
       "author",
       "name email department"
     );
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Post created successfully",
-        post: populatedPost,
-      });
+    res.status(201).json({
+      success: true,
+      message: "Post created successfully",
+      post: populatedPost,
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -816,9 +792,133 @@ app.post("/api/forum/posts", auth, async (req, res) => {
 // ... other forum routes are also correct
 
 // =================================================================
-// ENHANCED PERSONALIZED DASHBOARD APIs
+// NEW: ENHANCED PERSONALIZED DASHBOARD APIs
 // =================================================================
-// ... (All existing dashboard code is correct)
+
+// Get comprehensive dashboard data
+app.get("/api/dashboard/:userId", auth, async (req, res) => {
+  try {
+    // 1. Find user by the userId in URL (e.g. "nina.hossain")
+    const userFromParams = await User.findOne({ userId: req.params.userId });
+
+    if (!userFromParams) {
+      return res.status(404).json({ success: false, error: "User not found." });
+    }
+
+    // 2. Security Check: Only allow user to view their own dashboard
+    if (req.user.id !== userFromParams._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: "Access denied. You can only view your own dashboard.",
+      });
+    }
+
+    const user = userFromParams;
+
+    // 3. Aggregate Dashboard Data
+    const [
+      applications,
+      applicationStats,
+      notifications,
+      unreadCount,
+      recentPosts,
+      dashboard,
+    ] = await Promise.all([
+      // Get recent applications
+      Application.find({ user: user._id })
+        .populate("job")
+        .sort({ createdAt: -1 })
+        .limit(5),
+
+      // Get application counts
+      (async () => ({
+        total: await Application.countDocuments({ user: user._id }),
+        pending: await Application.countDocuments({
+          user: user._id,
+          status: "Pending",
+        }),
+        accepted: await Application.countDocuments({
+          user: user._id,
+          status: "Accepted",
+        }),
+      }))(),
+
+      // Get notifications
+      Notification.find({ user: user._id })
+        .sort({ read: 1, createdAt: -1 })
+        .limit(10),
+
+      // Get unread count
+      Notification.countDocuments({ user: user._id, read: false }),
+
+      // Get user's recent forum posts
+      ForumPost.find({ author: user._id })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .lean(),
+
+      // Get saved jobs count
+      Dashboard.findOne({ user: user._id }),
+    ]);
+
+    // Add counts to forum posts
+    const postsWithCounts = await Promise.all(
+      recentPosts.map(async (post) => {
+        const commentCount = await ForumComment.countDocuments({
+          post: post._id,
+        });
+        return { ...post, likeCount: post.likes.length, commentCount };
+      })
+    );
+
+    // Populate connections for the connections tab
+    await user.populate("connections", "name email department");
+
+    res.json({
+      success: true,
+      data: {
+        userId: user.userId,
+        studentInfo: {
+          name: user.name,
+          email: user.email,
+          department: user.department,
+          cgpa: user.cgpa,
+        },
+        applications,
+        applicationStats,
+        notifications,
+        unreadNotificationCount: unreadCount,
+        connections: user.connections || [],
+        connectionCount: user.connections ? user.connections.length : 0,
+        recentForumPosts: postsWithCounts,
+        savedJobsCount: dashboard ? dashboard.savedJobs.length : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard API Error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Server error while fetching dashboard data.",
+    });
+  }
+});
+
+// Route to Mark All Notifications as Read
+app.patch(
+  "/api/dashboard/notifications/mark-all-read",
+  auth,
+  async (req, res) => {
+    try {
+      await Notification.updateMany(
+        { user: req.user.id, read: false },
+        { $set: { read: true } }
+      );
+      res.json({ success: true, message: "All notifications marked as read" });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
 
 // =================================================================
 // SERVER START
