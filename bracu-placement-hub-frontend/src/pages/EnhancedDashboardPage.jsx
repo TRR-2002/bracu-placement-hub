@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 function EnhancedDashboardPage() {
@@ -9,7 +9,8 @@ function EnhancedDashboardPage() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
-  const fetchDashboardData = async () => {
+  // Wrapped in useCallback to prevent infinite loops and satisfy ESLint
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -51,11 +52,12 @@ function EnhancedDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, navigate]); // These are the dependencies that make the function recreate
 
+  // Effect now depends on the memoized function
   useEffect(() => {
     fetchDashboardData();
-  }, [userId]);
+  }, [fetchDashboardData]);
 
   const handleMarkAllRead = async () => {
     try {
