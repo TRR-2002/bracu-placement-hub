@@ -238,17 +238,31 @@ function Navbar() {
                         </button>
                       </>
                     )}
+                    {/* --- THIS IS THE MODIFIED SECTION --- */}
                     {user.role === "recruiter" && (
-                      <button
-                        onClick={() => {
-                          navigate("/company/edit-profile");
-                          setShowProfileDropdown(false);
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Company Profile
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            // Note: A recruiter's user document ID is their company ID
+                            navigate(`/company/${user._id}`);
+                            setShowProfileDropdown(false);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          View Company Profile
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigate("/company/edit-profile");
+                            setShowProfileDropdown(false);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          Edit Company Profile
+                        </button>
+                      </>
                     )}
+                    {/* --- END OF MODIFIED SECTION --- */}
                     <div className="border-t my-1"></div>
                     <button
                       onClick={handleLogout}
