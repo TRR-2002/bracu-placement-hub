@@ -1,7 +1,7 @@
 // src/pages/JobSearchPage.jsx
 
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { searchJobs, saveJob, unsaveJob } from "../api/jobApi";
 import api from "../api/axiosConfig";
 import Navbar from "../components/Navbar";
@@ -9,7 +9,7 @@ import Navbar from "../components/Navbar";
 function JobSearchPage() {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
-  const [savedJobIds, setSavedJobIds] = useState(new Set()); // Use a Set for efficient lookups
+  const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -57,7 +57,7 @@ function JobSearchPage() {
 
   useEffect(() => {
     fetchJobsAndSavedStatus();
-  }, []); // Fetch only on initial load
+  }, []);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -66,11 +66,11 @@ function JobSearchPage() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchJobsAndSavedStatus(); // Re-fetch with new filters
+    fetchJobsAndSavedStatus();
   };
 
   const handleSaveToggle = async (jobId, e) => {
-    e.stopPropagation(); // Prevent navigation when clicking the save button
+    e.stopPropagation();
 
     try {
       const newSavedJobIds = new Set(savedJobIds);
@@ -151,10 +151,10 @@ function JobSearchPage() {
               {jobs.map((job) => {
                 const isSaved = savedJobIds.has(job._id);
                 return (
+                  // --- FIX: Removed onClick from this main div ---
                   <div
                     key={job._id}
-                    className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition cursor-pointer"
-                    onClick={() => navigate(`/jobs/${job._id}`)}
+                    className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition"
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
@@ -199,6 +199,15 @@ function JobSearchPage() {
                         >
                           <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
                         </svg>
+                      </button>
+                    </div>
+                    {/* --- FIX: Added the View Details button back --- */}
+                    <div className="mt-4">
+                      <button
+                        onClick={() => navigate(`/jobs/${job._id}`)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700"
+                      >
+                        View Details →
                       </button>
                     </div>
                   </div>
