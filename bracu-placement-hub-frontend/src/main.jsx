@@ -1,63 +1,72 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import {
-  createBrowserRouter,
-  RouterProvider,
-  Navigate,
-} from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
 // Import CSS
 import "./index.css";
 
-// Import Layout
-import MainLayout from "./layouts/MainLayout.jsx";
-
-// Import Page Components - Authentication
-import App from "./App.jsx";
+// Authentication Pages
+import App from "./App.jsx"; // Dev Login
 import LoginPage from "./pages/LoginPage.jsx";
-import RegisterPage from "./pages/RegisterPage.jsx";
+import RegisterPageWithOTP from "./pages/RegisterPageWithOTP.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 
-// Import Page Components - Student
+// Student Profile Pages
 import CreateProfilePage from "./pages/CreateProfilePage.jsx";
 import ViewProfilePage from "./pages/ViewProfilePage.jsx";
+import StudentDashboard from "./pages/StudentDashboard.jsx"; // <-- ADD THIS
 import EditProfilePage from "./pages/EditProfilePage.jsx";
 
-// Import Page Components - Job Discovery
+// Job Discovery & Application (Student)
 import JobSearchPage from "./pages/JobSearchPage.jsx";
 import JobDetailsPage from "./pages/JobDetailsPage.jsx";
 import ApplicationConfirmPage from "./pages/ApplicationConfirmPage.jsx";
 import ApplicationSuccessPage from "./pages/ApplicationSuccessPage.jsx";
 
-// Import Page Components - Recruiter
+//Notifications
+import NotificationsPage from "./pages/NotificationsPage";
+import JobApplicationsPage from "./pages/JobApplicationsPage";
+
+// Invitations (Student)
+import InvitationsPage from "./pages/InvitationsPage.jsx";
+
+// Recruiter Pages
 import RecruiterDashboard from "./pages/RecruiterDashboard.jsx";
 import CreateJobPage from "./pages/CreateJobPage.jsx";
 import EditJobPage from "./pages/EditJobPage.jsx";
+import TalentSearchPage from "./pages/TalentSearchPage.jsx";
+import CreateCompanyProfilePage from "./pages/CreateCompanyProfilePage.jsx";
+import EditCompanyProfilePage from "./pages/EditCompanyProfilePage.jsx";
+// Company & Reviews
+import CompanyProfilePage from "./pages/CompanyProfilePage.jsx";
 
-// Import Page Components - Admin
+// Messaging
+import MessagesPage from "./pages/MessagesPage.jsx";
+
+// Forum
+import ForumPage from "./pages/ForumPage.jsx";
+import ForumPostDetail from "./pages/ForumPostDetail.jsx";
+import CreatePostPage from "./pages/CreatePostPage.jsx"; // <-- ADD THIS LINE
+
+// Calendar
+import CalendarPage from "./pages/CalendarPage.jsx";
+
+// Admin
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 
-// Import Page Components - Community Forum
-import ForumPage from "./pages/ForumPage.jsx";
-import CreateForumPostPage from "./pages/CreateForumPostPage.jsx";
-import ForumPostDetailsPage from "./pages/ForumPostDetailsPage.jsx";
-
-// Import Page Components - Enhanced Dashboard
-import EnhancedDashboardPage from "./pages/EnhancedDashboardPage.jsx";
-
-// Import route protection components
-import StudentOnlyRoute from "./components/StudentOnlyRoute.jsx";
-import RecruiterOnlyRoute from "./components/RecruiterOnlyRoute.jsx";
-import AdminOnlyRoute from "./components/AdminOnlyRoute.jsx";
+// Error Page
+import ErrorPage from "./pages/ErrorPage.jsx";
 
 // Create the router configuration
 const router = createBrowserRouter([
   // ============================================
-  // AUTHENTICATION ROUTES (NO NAVBAR)
+  // AUTHENTICATION ROUTES
   // ============================================
   {
     path: "/",
-    element: <LoginPage />,
+    element: <LoginPage />, // Main login page
+    errorElement: <ErrorPage />,
   },
   {
     path: "/login",
@@ -65,151 +74,161 @@ const router = createBrowserRouter([
   },
   {
     path: "/register",
-    element: <RegisterPage />,
+    element: <RegisterPageWithOTP />, // NEW: OTP-based registration
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPasswordPage />, // NEW: Password reset with OTP
   },
   {
     path: "/dev-login",
-    element: <App />,
+    element: <App />, // Developer token login (for testing)
   },
 
   // ============================================
-  // MAIN APP ROUTES (WITH NAVBAR)
+  // STUDENT PROFILE ROUTES
   // ============================================
   {
-    element: <MainLayout />,
-    children: [
-      // STUDENT-ONLY ROUTES (Protected from recruiters)
-      {
-        path: "/create-profile",
-        element: (
-          <StudentOnlyRoute>
-            <CreateProfilePage />
-          </StudentOnlyRoute>
-        ),
-      },
-      {
-        path: "/profile/view/:userId",
-        element: (
-          <StudentOnlyRoute>
-            <ViewProfilePage />
-          </StudentOnlyRoute>
-        ),
-      },
-      {
-        path: "/profile/edit",
-        element: (
-          <StudentOnlyRoute>
-            <EditProfilePage />
-          </StudentOnlyRoute>
-        ),
-      },
+    path: "/create-profile",
+    element: <CreateProfilePage />,
+  },
+  {
+    path: "/dashboard",
+    element: <StudentDashboard />,
+  },
+  {
+    path: "/profile/view/:userId",
+    element: <ViewProfilePage />,
+  },
+  {
+    path: "/profile/edit",
+    element: <EditProfilePage />,
+  },
 
-      // JOB DISCOVERY & APPLICATION ROUTES (Student-only)
-      {
-        path: "/jobs",
-        element: (
-          <StudentOnlyRoute>
-            <JobSearchPage />
-          </StudentOnlyRoute>
-        ),
-      },
-      {
-        path: "/jobs/:jobId",
-        element: (
-          <StudentOnlyRoute>
-            <JobDetailsPage />
-          </StudentOnlyRoute>
-        ),
-      },
-      {
-        path: "/jobs/:jobId/apply",
-        element: (
-          <StudentOnlyRoute>
-            <ApplicationConfirmPage />
-          </StudentOnlyRoute>
-        ),
-      },
-      {
-        path: "/jobs/:jobId/application-success",
-        element: (
-          <StudentOnlyRoute>
-            <ApplicationSuccessPage />
-          </StudentOnlyRoute>
-        ),
-      },
+  // ============================================
+  // JOB DISCOVERY & APPLICATION ROUTES (STUDENT)
+  // ============================================
+  {
+    path: "/jobs",
+    element: <JobSearchPage />,
+  },
+  {
+    path: "/jobs/:jobId",
+    element: <JobDetailsPage />,
+  },
+  {
+    path: "/jobs/:jobId/apply",
+    element: <ApplicationConfirmPage />,
+  },
+  {
+    path: "/jobs/:jobId/application-success",
+    element: <ApplicationSuccessPage />,
+  },
 
-      // COMMUNITY FORUM ROUTES (Student-only)
-      {
-        path: "/forum",
-        element: (
-          <StudentOnlyRoute>
-            <ForumPage />
-          </StudentOnlyRoute>
-        ),
-      },
-      {
-        path: "/forum/create",
-        element: (
-          <StudentOnlyRoute>
-            <CreateForumPostPage />
-          </StudentOnlyRoute>
-        ),
-      },
-      {
-        path: "/forum/posts/:postId",
-        element: (
-          <StudentOnlyRoute>
-            <ForumPostDetailsPage />
-          </StudentOnlyRoute>
-        ),
-      },
+  // ============================================
+  // INVITATIONS (STUDENT)
+  // ============================================
+  {
+    path: "/invitations",
+    element: <InvitationsPage />, // NEW: View and respond to job invitations
+  },
 
-      // ENHANCED DASHBOARD ROUTE (Student-only)
-      {
-        path: "/dashboard/:userId",
-        element: (
-          <StudentOnlyRoute>
-            <EnhancedDashboardPage />
-          </StudentOnlyRoute>
-        ),
-      },
+  // ============================================
+  // NOTIFICATIONS
+  // ============================================
+  {
+    path: "/notifications",
+    element: <NotificationsPage />,
+  },
 
-      // RECRUITER-ONLY ROUTES (Protected from students)
-      {
-        path: "/recruiter/dashboard",
-        element: (
-          <RecruiterOnlyRoute>
-            <RecruiterDashboard />
-          </RecruiterOnlyRoute>
-        ),
-      },
-      {
-        path: "/recruiter/jobs/create",
-        element: (
-          <RecruiterOnlyRoute>
-            <CreateJobPage />
-          </RecruiterOnlyRoute>
-        ),
-      },
-      {
-        path: "/recruiter/jobs/edit/:jobId",
-        element: (
-          <RecruiterOnlyRoute>
-            <EditJobPage />
-          </RecruiterOnlyRoute>
-        ),
-      },
+  {
+    path: "/recruiter/jobs/:jobId/applications",
+    element: <JobApplicationsPage />,
+  },
 
-      // ADMIN-ONLY ROUTES (Protected from all others)
-      {
-        path: "/admin/dashboard",
-        element: (
-          <AdminOnlyRoute>
-            <AdminDashboard />
-          </AdminOnlyRoute>
-        ),
-      },
-    ],
+  // ============================================
+  // RECRUITER ROUTES
+  // ============================================
+  {
+    path: "/recruiter/dashboard",
+    element: <RecruiterDashboard />,
+  },
+  {
+    path: "/recruiter/jobs/create",
+    element: <CreateJobPage />,
+  },
+  {
+    path: "/recruiter/jobs/edit/:jobId",
+    element: <EditJobPage />,
+  },
+  {
+    path: "/recruiter/talent-search",
+    element: <TalentSearchPage />, // NEW: AI-powered talent search
+  },
+  {
+    path: "/company/create-profile",
+    element: <CreateCompanyProfilePage />,
+  },
+  {
+    path: "/company/edit-profile",
+    element: <EditCompanyProfilePage />,
+  },
+
+  // ============================================
+  // COMPANY & REVIEWS
+  // ============================================
+  {
+    path: "/company/:companyId",
+    element: <CompanyProfilePage />, // NEW: View company profile and reviews
+  },
+
+  // ============================================
+  // MESSAGING SYSTEM
+  // ============================================
+  {
+    path: "/messages",
+    element: <MessagesPage />, // NEW: Direct messaging
+  },
+
+  // ============================================
+  // FORUM ROUTES
+  // ============================================
+  {
+    path: "/forum",
+    element: <ForumPage />, // NEW: Community forum
+  },
+  {
+    path: "/forum/create",
+    element: <CreatePostPage />,
+  },
+  {
+    path: "/forum/posts/:postId",
+    element: <ForumPostDetail />, // NEW: Forum post detail with comments
+  },
+
+  // ============================================
+  // CALENDAR ROUTES
+  // ============================================
+  {
+    path: "/calendar",
+    element: <CalendarPage />, // NEW: View calendar, deadlines, and interviews
+  },
+
+  // ============================================
+  // ADMIN ROUTES
+  // ============================================
+  {
+    path: "/admin/dashboard",
+    element: <AdminDashboard />,
+  },
+
+  // ============================================
+  // CATCH-ALL / ERROR ROUTES
+  // ============================================
+  {
+    path: "*",
+    element: <ErrorPage />,
+    errorElement: <ErrorPage />,
   },
 ]);
 

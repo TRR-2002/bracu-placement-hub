@@ -1,229 +1,266 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";  // ← ADD THIS
+
 
 function ViewProfilePage() {
-  const { userId } = useParams();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchProfile = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const token = localStorage.getItem("token");
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          navigate("/");
+          return;
+        }
 
-      if (!token) {
-        setError("Please login to view profiles");
-        setTimeout(() => navigate("/login"), 2000);
-        return;
-      }
-
-      const response = await fetch(
-        `http://localhost:1350/api/profile/${userId}`,
-        {
+        const response = await fetch("http://localhost:1350/api/auth/profile", {
+          method: "GET",
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch profile");
         }
-      );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch profile");
+        const data = await response.json();
+        setUser(data.user);
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+        setError("Failed to load profile. Please try again.");
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const data = await response.json();
-      if (data.success && data.profile) {
-        setProfile(data.profile);
-      } else {
-        throw new Error("Profile data not found in response");
-      }
-    } catch (err) {
-      console.error("Error fetching profile:", err);
-      setError("Failed to load profile. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, navigate]);
-
-  useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    navigate("/");
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-xl text-gray-600">Loading profile...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl text-gray-600">Loading...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center p-8 bg-white shadow-md rounded-lg">
-          <p className="text-red-600 text-xl mb-4">{error}</p>
-          <button
-            onClick={() => navigate("/")}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
-          >
-            Go Home
-          </button>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {error}
         </div>
       </div>
     );
   }
 
-  if (!profile) {
+  if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-xl text-gray-600">Profile not found.</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl text-gray-600">No user data found.</p>
       </div>
     );
   }
-
-  const loggedInUserId = localStorage.getItem("userId");
-  const isOwnProfile = loggedInUserId === profile.userId;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header Section */}
-        <div className="bg-white rounded-lg shadow-xl p-8 mb-6">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900">
-                {profile.name}
-              </h1>
-              <p className="text-lg text-gray-600 mt-1">{profile.email}</p>
-            </div>
-            {isOwnProfile && (
-              <button
-                onClick={() => navigate("/profile/edit")}
-                className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold transition shadow-sm hover:shadow-md flex items-center gap-2"
-              >
-                <span>✏️</span> Edit Profile
-              </button>
-            )}
-          </div>
+    <>
+    <Navbar />
+    <div className="min-h-screen bg-gray-100 py-12 px-4">
+      <div className="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Your Profile</h1>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold transition"
+          >
+            Logout
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 border-t pt-6">
+        {/* Basic Info */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">Basic Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                Department
-              </h3>
-              <p className="text-lg text-gray-800">
-                {profile.department || "N/A"}
-              </p>
+              <p className="text-gray-600">Name</p>
+              <p className="text-lg font-semibold">{user.name}</p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                User ID
-              </h3>
-              <p className="text-lg text-gray-800">{profile.userId || "N/A"}</p>
+              <p className="text-gray-600">Email</p>
+              <p className="text-lg font-semibold">{user.email}</p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                Student ID
-              </h3>
-              <p className="text-lg text-gray-800">
-                {profile.studentId || "N/A"}
-              </p>
+              <p className="text-gray-600">User ID</p>
+              <p className="text-lg font-semibold">{user.userId}</p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                CGPA
-              </h3>
-              <p className="text-lg text-gray-800">{profile.cgpa || "N/A"}</p>
+              <p className="text-gray-600">Student ID</p>
+              <p className="text-lg font-semibold">{user.studentId || "N/A"}</p>
             </div>
-            {/* Phone Number Section Removed */}
           </div>
         </div>
 
-        {/* Skills Section */}
-        {profile.skills && profile.skills.length > 0 && (
-          <div className="bg-white rounded-lg shadow-xl p-8 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Skills</h2>
-            <div className="flex flex-wrap gap-3">
-              {profile.skills.map((skill, index) => (
+        {/* Academic Info */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">Academic Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-gray-600">Department</p>
+              <p className="text-lg font-semibold">
+                {user.department || "N/A"}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-600">CGPA</p>
+              <p className="text-lg font-semibold">{user.cgpa || "N/A"}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Skills */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">Skills</h2>
+          <div className="flex flex-wrap gap-2">
+            {user.skills && user.skills.length > 0 ? (
+              user.skills.map((skill) => (
                 <span
-                  key={index}
-                  className="px-4 py-2 bg-blue-100 text-blue-800 rounded-full font-semibold text-sm"
+                  key={skill}
+                  className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
                 >
                   {skill}
                 </span>
-              ))}
-            </div>
+              ))
+            ) : (
+              <p className="text-gray-600">No skills added yet.</p>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Interests Section - FIXED */}
-        {profile.interests && profile.interests.length > 0 && (
-          <div className="bg-white rounded-lg shadow-xl p-8 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Interests</h2>
-            <div className="flex flex-wrap gap-3">
-              {profile.interests.map((interest, index) => (
+        {/* Interests */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">Interests</h2>
+          <div className="flex flex-wrap gap-2">
+            {user.interests && user.interests.length > 0 ? (
+              user.interests.map((interest) => (
                 <span
-                  key={index}
-                  className="px-4 py-2 bg-green-100 text-green-800 rounded-full font-semibold text-sm"
+                  key={interest}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full"
                 >
                   {interest}
                 </span>
-              ))}
-            </div>
+              ))
+            ) : (
+              <p className="text-gray-600">No interests added yet.</p>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Work Experience Section - FIXED */}
-        {profile.workExperience && profile.workExperience.length > 0 && (
-          <div className="bg-white rounded-lg shadow-xl p-8 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Work Experience
-            </h2>
-            <div className="space-y-6">
-              {profile.workExperience.map((exp, index) => (
-                <div key={index} className="border-l-4 border-indigo-500 pl-4">
-                  <h3 className="text-xl font-semibold text-gray-800">
-                    {exp.position}
-                  </h3>
-                  <p className="text-md text-gray-700 font-medium">
-                    {exp.company}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">{exp.duration}</p>
+        {/* Work Experience Section */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">Work Experience</h2>
+          {user.workExperience && user.workExperience.length > 0 ? (
+            <div className="space-y-4">
+              {user.workExperience.map((exp, index) => (
+                <div
+                  key={index}
+                  className="p-4 bg-purple-50 rounded-lg border border-purple-200"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <p className="text-lg font-semibold text-gray-800">
+                        {exp.position}
+                      </p>
+                      <p className="text-gray-700 font-medium">{exp.company}</p>
+                    </div>
+                    <span className="text-sm text-purple-700 bg-purple-100 px-3 py-1 rounded-full whitespace-nowrap ml-4">
+                      {exp.duration}
+                    </span>
+                  </div>
                   {exp.description && (
-                    <p className="text-gray-600 mt-2">{exp.description}</p>
+                    <p className="text-gray-600 mt-2 text-sm leading-relaxed">
+                      {exp.description}
+                    </p>
                   )}
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500 italic">
+                No work experience added yet.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Education Section */}
-        {profile.education && profile.education.length > 0 && (
-          <div className="bg-white rounded-lg shadow-xl p-8 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Education</h2>
-            <div className="space-y-6">
-              {profile.education.map((edu, index) => (
-                <div key={index} className="border-l-4 border-cyan-500 pl-4">
-                  <h3 className="text-xl font-semibold text-gray-800">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">Education</h2>
+          {user.education && user.education.length > 0 ? (
+            <div className="space-y-4">
+              {user.education.map((edu, index) => (
+                <div
+                  key={index}
+                  className="p-4 bg-green-50 rounded-lg border border-green-200"
+                >
+                  <p className="text-lg font-semibold text-gray-800">
                     {edu.degree}
-                  </h3>
-                  <p className="text-md text-gray-700 font-medium">
+                  </p>
+                  <p className="text-gray-700 font-medium mt-1">
                     {edu.institution}
                   </p>
-                  {/* FIXED: Display correct end year */}
-                  <p className="text-sm text-gray-500 mt-1">
-                    {edu.year || "N/A"}
+                  <p className="text-sm text-green-700 bg-green-100 px-3 py-1 rounded-full inline-block mt-2">
+                    {edu.year}
                   </p>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500 italic">
+                No education history added yet.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons - Added Browse Jobs button */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <button
+            onClick={() => navigate("/profile/edit")}
+            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold text-lg transition"
+          >
+            Edit Profile
+          </button>
+          <button
+            onClick={() => navigate("/jobs")}
+            className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-semibold text-lg transition"
+          >
+            Browse Jobs
+          </button>
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-3 bg-gray-700 text-white rounded-md hover:bg-gray-800 font-semibold text-lg transition"
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
     </div>
+    </>
   );
 }
 

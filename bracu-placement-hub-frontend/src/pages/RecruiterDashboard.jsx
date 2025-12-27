@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar"; // ← ADD THIS
 
 function RecruiterDashboard() {
   const navigate = useNavigate();
@@ -41,6 +42,21 @@ function RecruiterDashboard() {
         navigate("/"); // Redirect non-recruiters
         return;
       }
+      // -- ADD THIS NEW BLOCK --
+      const statusResponse = await fetch(
+        "http://localhost:1350/api/profile/status",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const statusData = await statusResponse.json();
+
+      if (statusData.success && !statusData.hasProfile) {
+        // If the recruiter has no company profile, redirect them
+        navigate("/company/create-profile");
+        return; // Stop further execution in this component
+      }
+      // -- END OF NEW BLOCK --
 
       setUserInfo(profileData.user);
 
@@ -159,179 +175,212 @@ function RecruiterDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                Recruiter Dashboard
-              </h1>
-              {userInfo && (
-                <p className="text-gray-600">Welcome, {userInfo.name}</p>
-              )}
-            </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold transition"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-gray-600 font-semibold mb-2">Total Jobs</h3>
-            <p className="text-3xl font-bold text-blue-600">{jobs.length}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-gray-600 font-semibold mb-2">Open Positions</h3>
-            <p className="text-3xl font-bold text-green-600">
-              {jobs.filter((job) => job.status === "Open").length}
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-gray-600 font-semibold mb-2">
-              Filled Positions
-            </h3>
-            <p className="text-3xl font-bold text-gray-600">
-              {jobs.filter((job) => job.status === "Filled").length}
-            </p>
-          </div>
-        </div>
-
-        {/* Create New Job Button */}
-        <div className="mb-6">
-          <button
-            onClick={handleCreateJob}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold text-lg transition"
-          >
-            + Create New Job Posting
-          </button>
-        </div>
-
-        {/* Job Listings */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800">
-              Your Job Postings
-            </h2>
-          </div>
-
-          {jobs.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-gray-600 text-lg mb-4">
-                You haven't posted any jobs yet.
-              </p>
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-gray-100">
+        {/* Header */}
+        <div className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">
+                  Recruiter Dashboard
+                </h1>
+                {userInfo && (
+                  <p className="text-gray-600">Welcome, {userInfo.name}</p>
+                )}
+              </div>
               <button
-                onClick={handleCreateJob}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold transition"
               >
-                Create Your First Job Posting
+                Logout
               </button>
             </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {jobs.map((job) => (
-                <div key={job._id} className="p-6 hover:bg-gray-50 transition">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-bold text-gray-800">
-                          {job.title}
-                        </h3>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                            job.status === "Open"
-                              ? "bg-green-100 text-green-800"
-                              : job.status === "Closed"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {job.status}
-                        </span>
-                      </div>
-                      <p className="text-gray-700 mb-2">{job.company}</p>
-                      {job.location && (
-                        <p className="text-gray-600 text-sm mb-2">
-                          📍 {job.location}
-                        </p>
-                      )}
-                      {job.description && (
-                        <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                          {job.description}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {job.requiredSkills &&
-                          job.requiredSkills.slice(0, 3).map((skill, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        {job.requiredSkills &&
-                          job.requiredSkills.length > 3 && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                              +{job.requiredSkills.length - 3} more
-                            </span>
-                          )}
-                      </div>
-                    </div>
+          </div>
+        </div>
 
-                    {/* Action Buttons */}
-                    <div className="ml-4 flex flex-col gap-2">
-                      <button
-                        onClick={() => handleViewApplications(job._id)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-semibold text-sm transition"
-                      >
-                        View Applications
-                      </button>
-                      <button
-                        onClick={() => handleEditJob(job._id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold text-sm transition"
-                      >
-                        Edit
-                      </button>
-                      {job.status === "Open" && (
-                        <button
-                          onClick={() => handleMarkAsFilled(job._id)}
-                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-semibold text-sm transition"
-                        >
-                          Mark as Filled
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDeleteJob(job._id)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold text-sm transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
+              {error}
             </div>
           )}
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-gray-600 font-semibold mb-2">Total Jobs</h3>
+              <p className="text-3xl font-bold text-blue-600">{jobs.length}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-gray-600 font-semibold mb-2">
+                Open Positions
+              </h3>
+              <p className="text-3xl font-bold text-green-600">
+                {jobs.filter((job) => job.status === "Open").length}
+              </p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-gray-600 font-semibold mb-2">
+                Filled Positions
+              </h3>
+              <p className="text-3xl font-bold text-gray-600">
+                {jobs.filter((job) => job.status === "Filled").length}
+              </p>
+            </div>
+          </div>
+
+          {/* Calendar Quick Access Card */}
+          <div className="mb-8 bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 rounded-lg shadow-lg overflow-hidden">
+            <div className="p-8 text-white">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center mb-3">
+                    <span className="text-4xl mr-3">📅</span>
+                    <h3 className="text-2xl font-bold">Interview Calendar</h3>
+                  </div>
+                  <p className="text-purple-100 mb-4 text-lg">
+                    Track deadlines, manage interviews, and never miss important
+                    dates
+                  </p>
+                  <button
+                    onClick={() => navigate("/calendar")}
+                    className="px-6 py-3 bg-white text-purple-600 font-bold rounded-lg hover:bg-gray-100 transition shadow-md"
+                  >
+                    📅 View Calendar
+                  </button>
+                </div>
+                <div className="hidden md:block text-6xl opacity-20">⏰</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Create New Job Button */}
+          <div className="mb-6">
+            <button
+              onClick={handleCreateJob}
+              className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold text-lg transition"
+            >
+              + Create New Job Posting
+            </button>
+          </div>
+
+          {/* Job Listings */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">
+                Your Job Postings
+              </h2>
+            </div>
+
+            {jobs.length === 0 ? (
+              <div className="p-12 text-center">
+                <p className="text-gray-600 text-lg mb-4">
+                  You haven't posted any jobs yet.
+                </p>
+                <button
+                  onClick={handleCreateJob}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
+                >
+                  Create Your First Job Posting
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {jobs.map((job) => (
+                  <div
+                    key={job._id}
+                    className="p-6 hover:bg-gray-50 transition"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-xl font-bold text-gray-800">
+                            {job.title}
+                          </h3>
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                              job.status === "Open"
+                                ? "bg-green-100 text-green-800"
+                                : job.status === "Closed"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {job.status}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 mb-2">{job.company}</p>
+                        {job.location && (
+                          <p className="text-gray-600 text-sm mb-2">
+                            📍 {job.location}
+                          </p>
+                        )}
+                        {job.description && (
+                          <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                            {job.description}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {job.requiredSkills &&
+                            job.requiredSkills.slice(0, 3).map((skill, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
+                              >
+                                {skill}
+                              </span>
+                            ))}
+                          {job.requiredSkills &&
+                            job.requiredSkills.length > 3 && (
+                              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                                +{job.requiredSkills.length - 3} more
+                              </span>
+                            )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="ml-4 flex flex-col gap-2">
+                        <button
+                          onClick={() => handleViewApplications(job._id)}
+                          className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-semibold text-sm transition"
+                        >
+                          View Applications
+                        </button>
+                        <button
+                          onClick={() => handleEditJob(job._id)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold text-sm transition"
+                        >
+                          Edit
+                        </button>
+                        {job.status === "Open" && (
+                          <button
+                            onClick={() => handleMarkAsFilled(job._id)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-semibold text-sm transition"
+                          >
+                            Mark as Filled
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteJob(job._id)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-semibold text-sm transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";  // ← ADD THIS
+
 
 function CreateJobPage() {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ function CreateJobPage() {
     description: "",
     requiredSkills: [],
     type: "Full-time",
+    applicationDeadline: "",
   });
   const [skillInput, setSkillInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,6 +110,7 @@ function CreateJobPage() {
         description: formData.description,
         requiredSkills: formData.requiredSkills,
         type: formData.type,
+        applicationDeadline: formData.applicationDeadline || undefined,
       };
 
       const response = await fetch("http://localhost:1350/api/recruiter/jobs", {
@@ -134,6 +138,8 @@ function CreateJobPage() {
   };
 
   return (
+    <>
+    <Navbar />
     <div className="min-h-screen bg-gray-100 py-12 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
@@ -278,6 +284,23 @@ function CreateJobPage() {
               </div>
             </div>
 
+            {/* Application Deadline */}
+            <div className="mb-4">
+              <label className="block text-gray-700 font-bold mb-2">
+                Application Deadline 📅
+              </label>
+              <input
+                type="datetime-local"
+                name="applicationDeadline"
+                value={formData.applicationDeadline}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Set a deadline for applications. This will be automatically added to all students' Google Calendar.
+              </p>
+            </div>
+
             {/* Job Description */}
             <div className="mb-4">
               <label className="block text-gray-700 font-bold mb-2">
@@ -365,6 +388,7 @@ function CreateJobPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

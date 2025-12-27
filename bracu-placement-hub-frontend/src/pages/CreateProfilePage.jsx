@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+
+
 function CreateProfilePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);

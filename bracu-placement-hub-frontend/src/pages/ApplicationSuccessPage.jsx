@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getJobDetails } from "../api/jobApi";
+import Navbar from "../components/Navbar";  // ← ADD THIS
+
 
 function ApplicationSuccessPage() {
   const { jobId } = useParams();
@@ -32,6 +34,8 @@ function ApplicationSuccessPage() {
   }
 
   return (
+    <>
+    <Navbar />
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center px-4">
       <div className="max-w-2xl w-full">
         {/* Success Card */}
@@ -164,6 +168,7 @@ function ApplicationSuccessPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

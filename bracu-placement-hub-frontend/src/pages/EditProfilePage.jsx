@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import Navbar from "../components/Navbar";  // ← ADD THIS
+
 
 function EditProfilePage() {
   const navigate = useNavigate();
@@ -168,6 +170,8 @@ function EditProfilePage() {
   if (loading) return <div className="text-center p-10">Loading...</div>;
 
   return (
+    <>
+    <Navbar />
     <div className="min-h-screen bg-gray-100 py-12 px-4">
       <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-6">
@@ -452,6 +456,7 @@ function EditProfilePage() {
         </form>
       </div>
     </div>
+    </>
   );
 }
 
