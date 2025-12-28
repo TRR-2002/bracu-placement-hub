@@ -126,6 +126,42 @@ function ForumPostDetail() {
     }
   };
 
+  const handleDeletePost = async () => {
+    if (!window.confirm("Are you sure you want to delete this post? This will also delete all comments.")) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:1350/api/forum/posts/${postId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete post");
+      }
+      navigate("/forum");
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Are you sure you want to delete this comment?")) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:1350/api/forum/comments/${commentId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete comment");
+      }
+      fetchPostWithComments();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -169,14 +205,24 @@ function ForumPostDetail() {
 
           {/* Post Card */}
           <div className="bg-white p-8 rounded-lg shadow-md mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
-                {post.category}
-              </span>
-              {post.flagged && (
-                <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
-                  Flagged
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                  {post.category}
                 </span>
+                {post.flagged && (
+                  <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
+                    Flagged
+                  </span>
+                )}
+              </div>
+              {localStorage.getItem("mongoId") === post.author?._id && (
+                <button
+                  onClick={handleDeletePost}
+                  className="text-red-600 hover:text-red-800 text-sm font-bold flex items-center gap-1"
+                >
+                  🗑️ Delete Post
+                </button>
               )}
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-4">
@@ -253,6 +299,14 @@ function ForumPostDetail() {
                         <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">
                           Flagged
                         </span>
+                      )}
+                      {localStorage.getItem("mongoId") === comment.author?._id && (
+                        <button
+                          onClick={() => handleDeleteComment(comment._id)}
+                          className="ml-auto text-red-500 hover:text-red-700 text-xs font-semibold"
+                        >
+                          Delete
+                        </button>
                       )}
                     </div>
                     <p className="text-gray-700">{comment.content}</p>

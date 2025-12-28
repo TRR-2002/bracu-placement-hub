@@ -59,6 +59,7 @@ function LoginPage() {
       loginAction(data);
       localStorage.setItem("token", data.token);
       localStorage.setItem("userId", data.user.userId);
+      localStorage.setItem("mongoId", data.user._id);
 
       // Role-based routing
       if (data.user.role === "student") {
@@ -180,7 +181,7 @@ function LoginPage() {
               className={`w-full font-bold py-3 rounded-md transition ${
                 isSubmitting
                   ? "bg-gray-400 cursor-not-allowed text-gray-700"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-violet-600 text-white hover:bg-violet-700"
               }`}
             >
               {isSubmitting ? "Signing in..." : "Sign In"}

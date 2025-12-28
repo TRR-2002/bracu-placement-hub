@@ -1033,6 +1033,7 @@ app.post("/api/auth/login", async (req, res) => {
       message: "Login successful",
       token,
       user: {
+        _id: user._id,
         userId: user.userId,
         name: user.name,
         email: user.email,
@@ -3408,6 +3409,62 @@ app.post("/api/forum/posts/:postId/comments", auth, async (req, res) => {
 
     res.status(201).json({ success: true, comment: populatedComment });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete forum post
+app.delete("/api/forum/posts/:postId", auth, async (req, res) => {
+  try {
+    const post = await ForumPost.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+
+    // Verify authorship
+    if (post.author.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: "You are not authorized to delete this post",
+      });
+    }
+
+    // Delete associated comments
+    await ForumComment.deleteMany({ post: req.params.postId });
+
+    // Delete the post
+    await ForumPost.findByIdAndDelete(req.params.postId);
+
+    res.json({ success: true, message: "Post and comments deleted successfully" });
+  } catch (error) {
+    console.error("Delete post error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete forum comment
+app.delete("/api/forum/comments/:commentId", auth, async (req, res) => {
+  try {
+    const comment = await ForumComment.findById(req.params.commentId);
+
+    if (!comment) {
+      return res.status(404).json({ success: false, error: "Comment not found" });
+    }
+
+    // Verify authorship
+    if (comment.author.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: "You are not authorized to delete this comment",
+      });
+    }
+
+    await ForumComment.findByIdAndDelete(req.params.commentId);
+
+    res.json({ success: true, message: "Comment deleted successfully" });
+  } catch (error) {
+    console.error("Delete comment error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
