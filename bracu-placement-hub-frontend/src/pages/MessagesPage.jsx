@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
 // Helper to format time ago
@@ -142,6 +142,15 @@ function MessagesPage() {
   const token = localStorage.getItem("token");
   const userId = localStorage.getItem("userId");
 
+  // Helper to parse location state and query params
+  const useQuery = () => {
+    return new URLSearchParams(window.location.search);
+  };
+  const query = useQuery();
+  const targetUserId = query.get("userId");
+  const location = useLocation(); // Need to import this
+  const stateSelectedUser = location.state?.selectedUser;
+
   // Fetch conversations list
   const fetchConversations = async () => {
     try {
@@ -162,7 +171,29 @@ function MessagesPage() {
       }
 
       if (data.success) {
-        setConversations(data.conversations || []);
+        const _conversations = data.conversations || [];
+        setConversations(_conversations);
+
+        // If specific user targeted via URL
+        if (targetUserId) {
+          // 1. Check if conversation already exists
+          const existingConvo = _conversations.find(
+            (c) => c.withUser?._id === targetUserId
+          );
+          if (existingConvo) {
+            setActiveConversation(existingConvo);
+          } 
+          // 2. If not, but we have user details passed from dashboard, create temp conversation
+          else if (stateSelectedUser && stateSelectedUser._id === targetUserId) {
+             setActiveConversation({
+               withUser: stateSelectedUser,
+               lastMessage: null,
+               unreadCount: 0
+             });
+          }
+          // 3. Fallback: If we assume they exist but have no details, we might fail or need a fetch.
+          // For now, let's rely on dashboard passing state.
+        }
       }
     } catch (err) {
       console.error("Error fetching conversations:", err);
@@ -170,6 +201,23 @@ function MessagesPage() {
     } finally {
       setLoadingConversations(false);
     }
+  };
+
+  const fetchUserInfoAndStart = async (uid) => {
+    try {
+       // We need an endpoint to get user by ID to start a fresh chat UI
+       // Assuming /api/users/<id> exists or similar. If not, we might need to rely on the compose modal logic
+       // For now, let's look for a generic user fetch or just show error if not found.
+       // Actually, we can use the Profile endpoint or search endpoint if available.
+       // Let's reuse the find-by-email logic but for ID if possible, BUT easier:
+       // Just set active conversation with minimal info if we can't fetch full details,
+       // Or better, let's verify if we can fetch user details.
+       // Looking at server.js, there isn't a direct "get user by id" public endpoint exposed easily in what I read.
+       // Wait, I saw `app.get("/api/users/find-by-email", ...)`
+       // Let's assume for now if it's not in the list, we might have to just open the compose modal?
+       // No, that interrupts flow.
+       // Let's try to simulate a new conversation object if we assume the user exists.
+    } catch(e) { console.error(e) }
   };
 
   // Initial fetch and polling

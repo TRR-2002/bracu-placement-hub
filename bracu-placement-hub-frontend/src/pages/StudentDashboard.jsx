@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { getConversations } from "../api/jobApi";
 
 function StudentDashboard() {
   const navigate = useNavigate();
@@ -48,20 +49,24 @@ function StudentDashboard() {
           fetch("http://localhost:1350/api/forum/my-posts", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:1350/api/messages/connections", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          getConversations(), // Use the API helper
         ]);
 
         const [profileData, overviewData, myPostsData, connectionsData] =
-          await Promise.all(responses.map((res) => res.json()));
+          await Promise.all([
+            responses[0].json(),
+            responses[1].json(),
+            responses[2].json(),
+            Promise.resolve(responses[3]), // getConversations returns data directly
+          ]);
 
         setUserProfile(profileData.user);
         setOverviewData(overviewData.data);
 
         // --- FIX: Ensure state is always an array ---
         setMyPosts(myPostsData.posts || []);
-        setConnections(connectionsData.connections || []);
+        // data.conversations is the array from getConversations ({ success: true, conversations: [...] })
+        setConnections(connectionsData.conversations || []);
       } catch (err) {
         setError(
           err.message || "An error occurred while loading dashboard data."
@@ -517,27 +522,40 @@ function StudentDashboard() {
                         </h3>
                         <div className="space-y-3">
                           {connections.length > 0 ? (
-                            connections.map((user) => (
+                            connections.map((conn) => {
+                              return (
                               <div
-                                key={user._id}
+                                key={conn.withUser.userId}
                                 className="bg-gray-50 p-4 rounded-lg flex justify-between items-center"
                               >
                                 <div>
                                   <p className="font-semibold text-gray-800">
-                                    {user.name}
+                                    {conn.withUser.name}
                                   </p>
-                                  <p className="text-sm text-gray-500">
-                                    {user.email}
+                                  <p className="text-xs text-blue-600 mb-1">
+                                    {conn.withUser.companyName ||
+                                      conn.withUser.role}
+                                  </p>
+                                  <p className="text-sm text-gray-500 max-w-xs truncate">
+                                    <span className="font-bold">
+                                      Last Message: {conn.lastMessage.content}
+                                    </span>
                                   </p>
                                 </div>
                                 <button
-                                  onClick={() => navigate("/messages")}
+                                  onClick={() =>
+                                    navigate(
+                                      `/messages?userId=${conn.withUser._id}`,
+                                      { state: { selectedUser: conn.withUser } }
+                                    )
+                                  }
                                   className="text-sm text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
                                 >
                                   Message
                                 </button>
                               </div>
-                            ))
+                              );
+                            })
                           ) : (
                             <p className="text-sm text-gray-500 text-center py-4">
                               You have not sent any messages yet.

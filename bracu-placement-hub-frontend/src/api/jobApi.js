@@ -175,3 +175,13 @@ export const fetchMessages = async () => {
     throw error.response?.data || error;
   }
 };
+
+export const getConversations = async () => {
+  try {
+    const headers = getAuthHeaders();
+    const response = await api.get("/messages/conversations", { headers });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};
