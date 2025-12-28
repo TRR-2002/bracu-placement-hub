@@ -132,6 +132,49 @@ function CompanyProfilePage() {
     }
   };
 
+  const handleEditClick = (review) => {
+    setEditingReviewId(review._id);
+    setReviewData({
+      rating: review.rating,
+      workCulture: review.workCulture,
+      salary: review.salary,
+      careerGrowth: review.careerGrowth,
+      comment: review.comment,
+    });
+    setShowReviewForm(true);
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm("Are you sure you want to delete this review?")) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:1350/api/reviews/${reviewId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete review");
+      }
+      alert("Review deleted successfully!");
+      fetchData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const closeReviewModal = () => {
+    setShowReviewForm(false);
+    setEditingReviewId(null);
+    setReviewData({
+      rating: 5,
+      workCulture: 5,
+      salary: 5,
+      careerGrowth: 5,
+      comment: "",
+    });
+  };
+
   if (loading) {
     return (
       <>
@@ -199,7 +242,17 @@ function CompanyProfilePage() {
               {/* --- MODIFIED: Conditionally render the button --- */}
               {userInfo && userInfo.role === "student" && (
                 <button
-                  onClick={() => setShowReviewForm(true)}
+                  onClick={() => {
+                    setEditingReviewId(null);
+                    setReviewData({
+                      rating: 5,
+                      workCulture: 5,
+                      salary: 5,
+                      careerGrowth: 5,
+                      comment: "",
+                    });
+                    setShowReviewForm(true);
+                  }}
                   className="px-6 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 flex-shrink-0"
                 >
                   Write Review
@@ -295,7 +348,25 @@ function CompanyProfilePage() {
                         <RenderStars rating={review.careerGrowth} />
                       </div>
                     </div>
-                    <p className="text-gray-700">{review.comment}</p>
+                    <p className="text-gray-700 whitespace-pre-line">{review.comment}</p>
+                    
+                    {/* Edit/Delete Buttons for Author */}
+                    {userInfo && userInfo._id === review.reviewer?._id && (
+                      <div className="mt-4 flex gap-4">
+                        <button
+                          onClick={() => handleEditClick(review)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center gap-1"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReview(review._id)}
+                          className="text-red-600 hover:text-red-800 text-sm font-semibold flex items-center gap-1"
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -316,7 +387,7 @@ function CompanyProfilePage() {
                 {editingReviewId ? "Edit Your Review" : "Write a Review"}
               </h2>
               <button
-                onClick={() => setShowReviewForm(false)}
+                onClick={closeReviewModal}
                 className="text-gray-600 hover:text-gray-800 text-2xl"
               >
                 &times;
@@ -428,11 +499,11 @@ function CompanyProfilePage() {
                   type="submit"
                   className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
                 >
-                  Submit Review
+                  {editingReviewId ? "Update Review" : "Submit Review"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowReviewForm(false)}
+                  onClick={closeReviewModal}
                   className="px-6 py-3 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 font-semibold"
                 >
                   Cancel
