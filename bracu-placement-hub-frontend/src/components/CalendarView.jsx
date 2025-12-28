@@ -60,13 +60,17 @@ const CalendarView = ({ token }) => {
 
   // Get events for a specific date
   const getEventsForDate = (day) => {
-    const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
-      .toISOString()
-      .split('T')[0];
+    const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     
     return events.filter(event => {
-      const eventDate = new Date(event.deadline).toISOString().split('T')[0];
-      return eventDate === dateStr;
+      const eventDate = new Date(event.deadline);
+      
+      // Compare using local date components (not UTC)
+      const sameYear = eventDate.getFullYear() === targetDate.getFullYear();
+      const sameMonth = eventDate.getMonth() === targetDate.getMonth();
+      const sameDay = eventDate.getDate() === targetDate.getDate();
+      
+      return sameYear && sameMonth && sameDay;
     });
   };
 

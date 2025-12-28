@@ -513,6 +513,11 @@ const ApplicationSchema = new mongoose.Schema(
       ],
       education: [{ institution: String, degree: String, year: String }],
     },
+    // Interview scheduling fields
+    interviewScheduled: { type: Boolean, default: false },
+    interviewTime: Date,
+    interviewMeetLink: String,
+    interviewCalendarEventId: String,
   },
   { timestamps: true }
 );
@@ -1980,6 +1985,219 @@ app.patch(
     }
   }
 );
+
+// Schedule interview for accepted application
+app.post(
+  "/api/recruiter/applications/:id/schedule-interview",
+  auth,
+  recruiterAuth,
+  async (req, res) => {
+    try {
+      const { interviewTime, meetLink } = req.body;
+
+      if (!interviewTime) {
+        return res.status(400).json({
+          success: false,
+          error: "Interview time is required",
+        });
+      }
+
+      const application = await Application.findById(req.params.id)
+        .populate("job")
+        .populate("user", "email name");
+
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          error: "Application not found",
+        });
+      }
+
+      // Verify recruiter owns the job
+      const job = await Job.findOne({
+        _id: application.job._id,
+        recruiter: req.user.id,
+      });
+
+      if (!job) {
+        return res.status(403).json({
+          success: false,
+          error: "You are not authorized to schedule interviews for this job",
+        });
+      }
+
+      // Verify application is accepted
+      if (application.status !== "Accepted") {
+        return res.status(400).json({
+          success: false,
+          error: "Can only schedule interviews for accepted applications",
+        });
+      }
+
+      // Get recruiter email
+      const recruiter = await User.findById(req.user.id);
+
+      // Schedule interview on Google Calendar
+      const calendarResult = await scheduleInterviewSlot(
+        application.user.email,
+        recruiter.email,
+        job.title,
+        job.company,
+        interviewTime,
+        meetLink
+      );
+
+      // Store interview details in application
+      // Parse the datetime string and create a proper Date object
+      // The interviewTime comes as "2025-12-30T18:05" from datetime-local input
+      const interviewDate = new Date(interviewTime);
+      
+      application.interviewScheduled = true;
+      application.interviewTime = interviewDate;
+      application.interviewMeetLink = meetLink;
+      application.interviewCalendarEventId = calendarResult.success
+        ? calendarResult.eventId
+        : null;
+      await application.save();
+
+      // Notify student about interview
+      await createNotification(
+        application.user._id,
+        "application",
+        "Interview Scheduled",
+        `Your interview for ${job.title} at ${job.company} has been scheduled for ${new Date(
+          interviewTime
+        ).toLocaleString()}.${meetLink ? ` Meeting link: ${meetLink}` : ""}`,
+        `/applications`
+      );
+
+      res.json({
+        success: true,
+        message: "Interview scheduled successfully",
+        interview: {
+          time: interviewTime,
+          meetLink,
+          calendarSynced: calendarResult.success,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+// =================================================================
+// CALENDAR API - Get all deadlines and interviews
+// =================================================================
+app.get("/api/calendar/deadlines", auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    let events = [];
+
+    if (userRole === "student") {
+      // For students: Get job application deadlines and scheduled interviews
+      
+      // Get jobs student has applied to
+      const studentApplications = await Application.find({ user: userId })
+        .populate("job")
+        .lean();
+
+      studentApplications.forEach((app) => {
+        if (app.job && app.job.applicationDeadline) {
+          events.push({
+            jobTitle: app.job.title,
+            company: app.job.company,
+            deadline: app.job.applicationDeadline,
+            eventType: "application_deadline",
+          });
+        }
+      });
+
+      // Get scheduled interviews for accepted applications
+      const acceptedApplications = await Application.find({
+        user: userId,
+        status: "Accepted",
+        interviewScheduled: true,
+      })
+        .populate("job")
+        .lean();
+
+      acceptedApplications.forEach((app) => {
+        if (app.interviewTime) {
+          events.push({
+            jobTitle: app.job.title,
+            company: app.job.company,
+            deadline: app.interviewTime,
+            eventType: "interview",
+            meetLink: app.interviewMeetLink,
+          });
+        }
+      });
+    } else if (userRole === "recruiter") {
+      // For recruiters: Get their posted jobs and scheduled interviews
+      
+      // Get jobs posted by recruiter
+      const recruiterJobs = await Job.find({ recruiter: userId }).lean();
+
+      recruiterJobs.forEach((job) => {
+        if (job.applicationDeadline) {
+          events.push({
+            jobTitle: job.title,
+            company: job.company,
+            deadline: job.applicationDeadline,
+            eventType: "job_posting_deadline",
+          });
+        }
+      });
+
+      // Get scheduled interviews for recruiter's jobs
+      const scheduledInterviews = await Application.find({
+        interviewScheduled: true,
+      })
+        .populate("job")
+        .populate("user", "name email")
+        .lean();
+
+      const recruiterInterviews = scheduledInterviews.filter(
+        (app) => app.job && app.job.recruiter.toString() === userId
+      );
+
+      recruiterInterviews.forEach((app) => {
+        if (app.interviewTime) {
+          events.push({
+            jobTitle: app.job.title,
+            company: app.job.company,
+            deadline: app.interviewTime,
+            eventType: "interview",
+            candidateName: app.user.name,
+            candidateEmail: app.user.email,
+            meetLink: app.interviewMeetLink,
+          });
+        }
+      });
+    }
+
+    // Sort events by date
+    events.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+
+    // Separate upcoming and passed events
+    const now = new Date();
+    const upcoming = events.filter((e) => new Date(e.deadline) >= now);
+    const passed = events.filter((e) => new Date(e.deadline) < now);
+
+    res.json({
+      success: true,
+      upcoming,
+      passed,
+      total: events.length,
+    });
+  } catch (error) {
+    console.error("Error fetching calendar events:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // =================================================================
 // TALENT SOURCING & INVITATION SYSTEM (Module 2 - Feature 3)

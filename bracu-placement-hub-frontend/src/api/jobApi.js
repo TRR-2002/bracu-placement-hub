@@ -200,3 +200,22 @@ export const updateApplicationStatus = async (applicationId, status) => {
     throw error.response?.data || error;
   }
 };
+
+// Schedule interview for accepted application
+export const scheduleInterview = async (
+  applicationId,
+  interviewTime,
+  meetLink
+) => {
+  try {
+    const headers = getAuthHeaders();
+    const response = await api.post(
+      `/recruiter/applications/${applicationId}/schedule-interview`,
+      { interviewTime, meetLink },
+      { headers }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error;
+  }
+};

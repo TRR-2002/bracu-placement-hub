@@ -13,6 +13,7 @@ const InterviewSchedule = ({ token }) => {
   }, [token]);
 
   const fetchInterviews = async () => {
+    console.log('🔄 Refreshing interviews...');
     try {
       const response = await fetch('http://localhost:1350/api/calendar/deadlines', {
         headers: {
@@ -23,17 +24,21 @@ const InterviewSchedule = ({ token }) => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Interviews data received:', data);
         if (data.success) {
           // Filter for interview events
           const allEvents = [...(data.upcoming || []), ...(data.passed || [])];
           const interviewEvents = allEvents.filter(
             event => event.eventType === 'interview'
           );
+          console.log('📅 Interview events found:', interviewEvents.length);
           setInterviews(interviewEvents);
         }
+      } else {
+        console.error('❌ Failed to fetch interviews, status:', response.status);
       }
     } catch (error) {
-      console.error('Error fetching interviews:', error);
+      console.error('❌ Error fetching interviews:', error);
     } finally {
       setLoading(false);
     }
@@ -56,6 +61,7 @@ const InterviewSchedule = ({ token }) => {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
+      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -210,23 +216,25 @@ const InterviewSchedule = ({ token }) => {
                     </div>
                   </div>
 
-                  {/* Action buttons */}
-                  {status !== 'completed' && (
-                    <div className="mt-4 flex gap-2">
-                      <button className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition">
-                        Add to Calendar
-                      </button>
-                      <button className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition">
-                        Join Meeting
-                      </button>
+                  {/* Meeting link if available */}
+                  {interview.meetLink && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <Video className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm font-semibold">Meeting Link:</span>
+                      </div>
+                      <a
+                        href={interview.meetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 text-sm text-blue-600 hover:text-blue-800 underline break-all"
+                      >
+                        {interview.meetLink}
+                      </a>
                     </div>
                   )}
 
-                  {status === 'completed' && (
-                    <div className="mt-4 p-3 bg-gray-200 text-gray-700 rounded-lg text-center text-sm font-semibold">
-                      Interview Completed
-                    </div>
-                  )}
+
                 </div>
               );
             })}
@@ -235,10 +243,18 @@ const InterviewSchedule = ({ token }) => {
 
         {/* Refresh button */}
         <button
-          onClick={fetchInterviews}
-          className="mt-6 w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+          onClick={() => {
+            setLoading(true);
+            fetchInterviews();
+          }}
+          disabled={loading}
+          className={`mt-6 w-full font-semibold py-2 px-4 rounded-lg transition ${
+            loading
+              ? 'bg-purple-300 cursor-not-allowed'
+              : 'bg-purple-500 hover:bg-purple-600 text-white'
+          }`}
         >
-          Refresh Interviews
+          {loading ? 'Refreshing...' : 'Refresh Interviews'}
         </button>
       </div>
     </div>
