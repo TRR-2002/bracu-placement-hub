@@ -140,8 +140,13 @@ function JobSearchPage() {
                           {job.company}
                         </p>
                         <p className="text-gray-500 text-sm">{job.location}</p>
+                        {(job.salaryMin || job.salaryMax) && (
+                          <p className="text-gray-700 font-semibold mt-2">
+                             ৳ {job.salaryMin?.toLocaleString()} - ৳ {job.salaryMax?.toLocaleString()}
+                          </p>
+                        )}
                         {job.applicationDeadline && (
-                          <p className="text-sm text-red-700 font-medium mt-2">
+                          <p className="text-sm text-red-700 font-medium mt-1">
                             Deadline:{" "}
                             {new Date(job.applicationDeadline).toLocaleString()}
                           </p>
