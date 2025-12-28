@@ -12,6 +12,19 @@ function ForumPostDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [commentText, setCommentText] = useState("");
+  const [isEditingPost, setIsEditingPost] = useState(false);
+  const [editPostData, setEditPostData] = useState({ title: "", content: "", category: "" });
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editCommentText, setEditCommentText] = useState("");
+
+  const categories = [
+    "Interview Tips",
+    "Job Seeking",
+    "Career Advice",
+    "Networking",
+    "General Discussion",
+    "Company Reviews",
+  ];
 
   // This function ONLY fetches data, it does not change it.
   const fetchPostWithComments = async () => {
@@ -162,6 +175,66 @@ function ForumPostDetail() {
     }
   };
 
+  const handleEditPost = () => {
+    setEditPostData({
+      title: post.title,
+      content: post.content,
+      category: post.category
+    });
+    setIsEditingPost(true);
+  };
+
+  const handleUpdatePost = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:1350/api/forum/posts/${postId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(editPostData)
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update post");
+      }
+      setIsEditingPost(false);
+      fetchPostWithComments();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleEditComment = (comment) => {
+    setEditingCommentId(comment._id);
+    setEditCommentText(comment.content);
+  };
+
+  const handleUpdateComment = async (commentId) => {
+    if (!editCommentText.trim()) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:1350/api/forum/comments/${commentId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: editCommentText })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update comment");
+      }
+      setEditingCommentId(null);
+      fetchPostWithComments();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -216,26 +289,90 @@ function ForumPostDetail() {
                   </span>
                 )}
               </div>
-              {localStorage.getItem("mongoId") === post.author?._id && (
-                <button
-                  onClick={handleDeletePost}
-                  className="text-red-600 hover:text-red-800 text-sm font-bold flex items-center gap-1"
-                >
-                  🗑️ Delete Post
-                </button>
+              {localStorage.getItem("mongoId") === post.author?._id && !isEditingPost && (
+                <div className="flex gap-4">
+                  <button
+                    onClick={handleEditPost}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-1"
+                  >
+                    ✏️ Edit Post
+                  </button>
+                  <button
+                    onClick={handleDeletePost}
+                    className="text-red-600 hover:text-red-800 text-sm font-bold flex items-center gap-1"
+                  >
+                    🗑️ Delete Post
+                  </button>
+                </div>
               )}
             </div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">
-              {post.title}
-            </h1>
-            <div className="flex items-center gap-4 text-sm text-gray-600 mb-6">
-              <span>by {post.author?.name || "Anonymous"}</span>
-              <span>•</span>
-              <span>{new Date(post.createdAt).toLocaleDateString()}</span>
-            </div>
-            <p className="text-gray-700 leading-relaxed mb-6 whitespace-pre-wrap">
-              {post.content}
-            </p>
+
+            {isEditingPost ? (
+              <form onSubmit={handleUpdatePost} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={editPostData.title}
+                    onChange={(e) => setEditPostData({ ...editPostData, title: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={editPostData.category}
+                    onChange={(e) => setEditPostData({ ...editPostData, category: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                  <textarea
+                    value={editPostData.content}
+                    onChange={(e) => setEditPostData({ ...editPostData, content: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    rows="8"
+                    required
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPost(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <h1 className="text-3xl font-bold text-gray-800 mb-4">
+                  {post.title}
+                </h1>
+                <div className="flex items-center gap-4 text-sm text-gray-600 mb-6">
+                  <span>by {post.author?.name || "Anonymous"}</span>
+                  <span>•</span>
+                  <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                </div>
+                <p className="text-gray-700 leading-relaxed mb-6 whitespace-pre-wrap">
+                  {post.content}
+                </p>
+              </>
+            )}
             <div className="flex items-center gap-6 pt-4 border-t text-gray-600">
               <button
                 onClick={handleLikePost}
@@ -301,15 +438,48 @@ function ForumPostDetail() {
                         </span>
                       )}
                       {localStorage.getItem("mongoId") === comment.author?._id && (
-                        <button
-                          onClick={() => handleDeleteComment(comment._id)}
-                          className="ml-auto text-red-500 hover:text-red-700 text-xs font-semibold"
-                        >
-                          Delete
-                        </button>
+                        <div className="ml-auto flex gap-3">
+                          <button
+                            onClick={() => handleEditComment(comment)}
+                            className="text-blue-500 hover:text-blue-700 text-xs font-semibold"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteComment(comment._id)}
+                            className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <p className="text-gray-700">{comment.content}</p>
+                    {editingCommentId === comment._id ? (
+                      <div className="space-y-2 mt-2">
+                        <textarea
+                          value={editCommentText}
+                          onChange={(e) => setEditCommentText(e.target.value)}
+                          className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                          rows="3"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleUpdateComment(comment._id)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-semibold"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingCommentId(null)}
+                            className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs font-semibold"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-700 mt-1">{comment.content}</p>
+                    )}
                     <div className="mt-2">
                       <button
                         onClick={() => handleLikeComment(comment._id)}

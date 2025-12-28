@@ -3469,6 +3469,98 @@ app.delete("/api/forum/comments/:commentId", auth, async (req, res) => {
   }
 });
 
+// Update forum post
+app.put("/api/forum/posts/:postId", auth, async (req, res) => {
+  try {
+    const { title, content, category, tags } = req.body;
+    const post = await ForumPost.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ success: false, error: "Post not found" });
+    }
+
+    // Verify authorship
+    if (post.author.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: "You are not authorized to edit this post",
+      });
+    }
+
+    // AI content moderation
+    const moderation = await moderateContent(`${title || post.title} ${content || post.content}`);
+
+    // Update fields
+    if (title) post.title = title;
+    if (content) post.content = content;
+    if (category) post.category = category;
+    if (tags) post.tags = tags;
+    
+    post.flagged = moderation.flagged;
+    post.flagReason = moderation.flagged ? moderation.flags.join("; ") : null;
+    post.aiAnalysis = moderation.analysis;
+
+    await post.save();
+
+    res.json({
+      success: true,
+      message: "Post updated successfully",
+      post,
+      moderated: moderation.flagged,
+    });
+  } catch (error) {
+    console.error("Update post error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update forum comment
+app.put("/api/forum/comments/:commentId", auth, async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: "Content is required" });
+    }
+
+    const comment = await ForumComment.findById(req.params.commentId);
+
+    if (!comment) {
+      return res.status(404).json({ success: false, error: "Comment not found" });
+    }
+
+    // Verify authorship
+    if (comment.author.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: "You are not authorized to edit this comment",
+      });
+    }
+
+    // AI moderation
+    const moderation = await moderateContent(content);
+
+    comment.content = content;
+    comment.flagged = moderation.flagged;
+
+    await comment.save();
+
+    const populatedComment = await ForumComment.findById(comment._id).populate(
+      "author",
+      "name email"
+    );
+
+    res.json({
+      success: true,
+      message: "Comment updated successfully",
+      comment: populatedComment,
+      moderated: moderation.flagged,
+    });
+  } catch (error) {
+    console.error("Update comment error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // =================================================================
 // NOTIFICATION CENTER (Module 3 - Feature 3)
 // =================================================================
