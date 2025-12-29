@@ -709,14 +709,14 @@ const CalendarEventSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     application: { type: mongoose.Schema.Types.ObjectId, ref: "Application" },
-    job: { type: mongoose.Schema.Types.ObjectId, ref: "Job", required: true },
+    job: { type: mongoose.Schema.Types.ObjectId, ref: "Job" }, // Not required for recruitment drives
     googleEventId: { type: String },
     deadline: { type: Date, required: true },
     jobTitle: String,
     company: String,
     eventType: {
       type: String,
-      enum: ["job_posting_deadline", "application_deadline", "interview"],
+      enum: ["job_posting_deadline", "application_deadline", "interview", "recruitment"],
       default: "application_deadline",
     },
     isAutomaticSync: { type: Boolean, default: false },
@@ -2131,6 +2131,31 @@ app.get("/api/calendar/deadlines", auth, async (req, res) => {
             company: app.job.company,
             deadline: app.job.applicationDeadline,
             eventType: "application_deadline",
+            applied: true, // Tag as already applied
+          });
+        }
+      });
+
+      // ✅ ADDED: Get ALL future job deadlines to show in the calendar
+      const allUpcomingJobs = await Job.find({
+        applicationDeadline: { $gte: new Date() }
+      }).lean();
+
+      allUpcomingJobs.forEach(job => {
+        // Only add if not already in events (avoid duplicates with application deadlines)
+        const alreadyApplied = events.some(e => 
+          e.jobTitle === job.title && 
+          e.company === job.company && 
+          new Date(e.deadline).getTime() === new Date(job.applicationDeadline).getTime()
+        );
+
+        if (!alreadyApplied) {
+          events.push({
+            jobTitle: job.title,
+            company: job.company,
+            deadline: job.applicationDeadline,
+            eventType: "job_posting_deadline",
+            applied: false
           });
         }
       });
@@ -2165,7 +2190,7 @@ app.get("/api/calendar/deadlines", auth, async (req, res) => {
         .lean();
 
       acceptedApplications.forEach((app) => {
-        if (app.interviewTime) {
+        if (app.interviewTime && app.job) {
           events.push({
             jobTitle: app.job.title,
             company: app.job.company,
@@ -2201,7 +2226,7 @@ app.get("/api/calendar/deadlines", auth, async (req, res) => {
         .lean();
 
       const recruiterInterviews = scheduledInterviews.filter(
-        (app) => app.job && app.job.recruiter.toString() === userId
+        (app) => app.job && app.user && app.job.recruiter && app.job.recruiter.toString() === userId
       );
 
       recruiterInterviews.forEach((app) => {
@@ -4436,6 +4461,24 @@ app.post(
             `/notifications`,
             recruiter._id
           );
+
+          // ✅ NEW: Persist to CalendarEvent so it shows on student's local calendar
+          try {
+            const calendarEvent = new CalendarEvent({
+              user: student._id,
+              job: null, // No specific job required for a company-wide drive
+              googleEventId: calendarResult.success ? calendarResult.eventId : null,
+              deadline: startTime,
+              jobTitle: eventName,
+              company: recruiter.companyName,
+              eventType: "recruitment",
+              isAutomaticSync: true,
+              googleSyncStatus: calendarResult.success ? "synced" : "failed"
+            });
+            await calendarEvent.save();
+          } catch (calErr) {
+            console.error(`Failed to save calendar event for student ${student.email}:`, calErr);
+          }
         }
       }
 
