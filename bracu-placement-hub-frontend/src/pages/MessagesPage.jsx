@@ -454,8 +454,10 @@ function MessagesPage() {
                     </h2>
                     <div className="flex items-center gap-2 mt-0.5">
                       <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                      <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">
-                        {activeConversation.withUser.role || "Member"}
+                      <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest flex items-center gap-2">
+                        <span>{activeConversation.withUser.role || "Member"}</span>
+                        <span className="opacity-30 text-gray-400">•</span>
+                        <span className="lowercase font-medium text-gray-400 select-all tracking-normal">{activeConversation.withUser.email}</span>
                       </p>
                     </div>
                   </div>
