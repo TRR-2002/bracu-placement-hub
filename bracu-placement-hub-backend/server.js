@@ -70,7 +70,9 @@ async function addApplicationDeadlineToCalendar(
         dateTime: new Date(new Date(deadline).getTime() + 60 * 60 * 1000), // 1 hour duration
         timeZone: "Asia/Dhaka",
       },
-      attendees: [{ email: userEmail }],
+      // ⚠️ NOTE: Removed attendees because Service Accounts cannot invite attendees
+      // without Domain-Wide Delegation of Authority.
+      // attendees: [{ email: userEmail }], 
       reminders: {
         useDefault: false,
         overrides: [
@@ -2112,6 +2114,26 @@ app.get("/api/calendar/deadlines", auth, async (req, res) => {
             company: app.job.company,
             deadline: app.job.applicationDeadline,
             eventType: "application_deadline",
+          });
+        }
+      });
+
+      // NEW: Get broadcasted job deadlines and synced events from the CalendarEvent model
+      const syncedEvents = await CalendarEvent.find({ user: userId }).lean();
+      syncedEvents.forEach((syncEv) => {
+        // Only add if not already in events (avoid duplicates)
+        const exists = events.some(
+          (e) => 
+            e.jobTitle === syncEv.jobTitle && 
+            new Date(e.deadline).getTime() === new Date(syncEv.deadline).getTime()
+        );
+        if (!exists) {
+          events.push({
+            jobTitle: syncEv.jobTitle,
+            company: syncEv.company,
+            deadline: syncEv.deadline,
+            eventType: syncEv.eventType || "job_posting_deadline",
+            googleSyncStatus: syncEv.googleSyncStatus
           });
         }
       });
