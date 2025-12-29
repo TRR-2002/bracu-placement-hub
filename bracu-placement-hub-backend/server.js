@@ -87,7 +87,7 @@ async function addApplicationDeadlineToCalendar(
     const response = await googleCalendar.events.insert({
       calendarId: "primary",
       resource: event,
-      sendUpdates: "all",
+      sendUpdates: "none",
     });
 
     console.log("✅ Application deadline added to calendar:", response.data.id);
@@ -164,7 +164,7 @@ async function createJobPostingEvent(
     const response = await googleCalendar.events.insert({
       calendarId: "primary",
       resource: event,
-      sendUpdates: "all",
+      sendUpdates: "none",
     });
 
     console.log("✅ Job posting event created on calendar:", response.data.id);
@@ -207,10 +207,12 @@ async function createRecruitmentDriveEvent(
         dateTime: new Date(endTime),
         timeZone: "Asia/Dhaka",
       },
-      attendees: attendees.map((email) => ({
-        email,
-        responseStatus: "needsAction",
-      })),
+      // ⚠️ Note: Removed attendees because Service Accounts cannot invite attendees
+      // without Domain-Wide Delegation. Internal app tracks participants via DB.
+      // attendees: attendees.map((email) => ({
+      //   email,
+      //   responseStatus: "needsAction",
+      // })),
       reminders: {
         useDefault: false,
         overrides: [
@@ -225,7 +227,7 @@ async function createRecruitmentDriveEvent(
     const response = await googleCalendar.events.insert({
       calendarId: "primary",
       resource: event,
-      sendUpdates: "all",
+      sendUpdates: "none",
     });
 
     console.log(
@@ -271,7 +273,9 @@ async function scheduleInterviewSlot(
         dateTime: new Date(new Date(interviewTime).getTime() + 60 * 60 * 1000), // 1 hour duration
         timeZone: "Asia/Dhaka",
       },
-      attendees: [{ email: studentEmail }, { email: recruiterEmail }],
+      // ⚠️ Note: Removed attendees because Service Accounts cannot invite attendees
+      // without Domain-Wide Delegation.
+      // attendees: [{ email: studentEmail }, { email: recruiterEmail }],
       reminders: {
         useDefault: false,
         overrides: [
@@ -296,7 +300,7 @@ async function scheduleInterviewSlot(
       calendarId: "primary",
       resource: event,
       conferenceDataVersion: meetLink ? 1 : 0,
-      sendUpdates: "all",
+      sendUpdates: "none",
     });
 
     console.log("✅ Interview scheduled on calendar:", response.data.id);
