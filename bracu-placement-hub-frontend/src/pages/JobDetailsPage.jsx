@@ -135,9 +135,14 @@ function JobDetailsPage() {
                 <h1 className="text-4xl font-bold text-gray-800 mb-2">
                   {job.title}
                 </h1>
-                <p className="text-2xl text-blue-600 font-semibold mb-2 hover:underline">
-                  <Link to={`/company/${job.companyId}`}>{job.company}</Link>
-                </p>
+                <div className="flex items-center gap-3 mb-2">
+                  <button
+                    onClick={() => navigate(`/company/${job.companyId}`)}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-bold hover:bg-gray-200 border transition"
+                  >
+                    🏢 View Company Profile
+                  </button>
+                </div>
                 {job.location && (
                   <p className="text-gray-600 flex items-center">
                     {job.location}

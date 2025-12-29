@@ -130,15 +130,6 @@ function JobSearchPage() {
                         <h2 className="text-2xl font-bold text-gray-800 mb-1">
                           {job.title}
                         </h2>
-                        <p
-                          className="text-blue-600 font-semibold hover:underline mb-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/company/${job.companyId}`);
-                          }}
-                        >
-                          {job.company}
-                        </p>
                         <p className="text-gray-500 text-sm">{job.location}</p>
                         {(job.salaryMin || job.salaryMax) && (
                           <p className="text-gray-700 font-semibold mt-2">
@@ -154,13 +145,19 @@ function JobSearchPage() {
                       </div>
 
                     </div>
-                    {/* --- FIX: Added the View Details button back --- */}
-                    <div className="mt-4">
+                    {/* Actions */}
+                    <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         onClick={() => navigate(`/jobs/${job._id}`)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition shadow-sm"
                       >
                         View Details →
+                      </button>
+                      <button
+                        onClick={() => navigate(`/company/${job.companyId}`)}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-200 transition border mb-2"
+                      >
+                        🏢 View Company Profile
                       </button>
                     </div>
                   </div>

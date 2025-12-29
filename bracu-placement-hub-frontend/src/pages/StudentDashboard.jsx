@@ -269,9 +269,6 @@ function StudentDashboard() {
                                     <p className="font-semibold text-gray-800">
                                       {app.job?.title}
                                     </p>
-                                    <p className="text-sm text-gray-500">
-                                      {app.job?.company}
-                                    </p>
                                   </div>
                                   <span
                                     className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -282,6 +279,13 @@ function StudentDashboard() {
                                   >
                                     {app.status}
                                   </span>
+                                  <button
+                                    onClick={() => navigate(`/company/${app.job?.recruiter}`)}
+                                    className="ml-2 px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-[10px] font-bold hover:bg-gray-200 border"
+                                    title="View Company Profile"
+                                  >
+                                    🏢
+                                  </button>
                                 </div>
                               ))
                             ) : (
@@ -349,9 +353,6 @@ function StudentDashboard() {
                                   <p className="font-semibold text-gray-800">
                                     {app.job?.title}
                                   </p>
-                                  <p className="text-sm text-gray-500">
-                                    {app.job?.company}
-                                  </p>
                                   <p className="text-xs text-gray-400 mt-1">
                                     Applied on:{" "}
                                     {new Date(
@@ -369,14 +370,24 @@ function StudentDashboard() {
                                   >
                                     {app.status}
                                   </span>
-                                  <button
-                                    onClick={() =>
-                                      navigate(`/jobs/${app.job?._id}`)
-                                    }
-                                    className="mt-2 text-sm text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
-                                  >
-                                    View Job
-                                  </button>
+                                  <div className="mt-2 flex gap-2 justify-end">
+                                    <button
+                                      onClick={() =>
+                                        navigate(`/jobs/${app.job?._id}`)
+                                      }
+                                      className="text-sm text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700 transition"
+                                    >
+                                      View Job
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        navigate(`/company/${app.job?.recruiter}`)
+                                      }
+                                      className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 border transition"
+                                    >
+                                      🏢 Company
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ))
@@ -454,16 +465,21 @@ function StudentDashboard() {
                                   <p className="font-semibold text-gray-800">
                                     {job.title}
                                   </p>
-                                  <p className="text-sm text-gray-500">
-                                    {job.company}
-                                  </p>
                                 </div>
-                                <button
-                                  onClick={() => navigate(`/jobs/${job._id}`)}
-                                  className="text-sm text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700"
-                                >
-                                  View Job
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => navigate(`/jobs/${job._id}`)}
+                                    className="text-sm text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700 transition"
+                                  >
+                                    View Job
+                                  </button>
+                                  <button
+                                    onClick={() => navigate(`/company/${job.recruiter}`)}
+                                    className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 border transition"
+                                  >
+                                    🏢 Company
+                                  </button>
+                                </div>
                               </div>
                             ))
                           ) : (

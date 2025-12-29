@@ -313,7 +313,7 @@ function RecruiterDashboard() {
                             {job.status}
                           </span>
                         </div>
-                        <p className="text-gray-700 mb-2">{job.company}</p>
+                        {/* Company name removed as per request */}
                         {job.location && (
                           <p className="text-gray-600 text-sm mb-2">
                             📍 {job.location}

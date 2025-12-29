@@ -219,18 +219,27 @@ function EditJobPage() {
             </div>
 
             {/* Company */}
-            <div className="mb-4">
-              <label className="block text-gray-700 font-bold mb-2">
-                Company Name *
+            <div className="mb-4 text-gray-400">
+              <label className="block text-gray-500 font-bold mb-2">
+                Company Name (Managed via Profile)
               </label>
               <input
                 type="text"
                 name="company"
                 value={formData.company}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-md"
-                required
+                className="w-full p-3 border border-gray-200 rounded-md bg-gray-50 cursor-not-allowed"
+                readOnly
               />
+              <p className="text-xs mt-1">
+                To change your company name, please update your{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/company/edit-profile")}
+                  className="text-blue-500 hover:underline"
+                >
+                  Company Profile
+                </button>.
+              </p>
             </div>
 
             {/* Job Type and Status */}
