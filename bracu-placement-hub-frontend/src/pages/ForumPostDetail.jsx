@@ -1,6 +1,6 @@
 // src/pages/ForumPostDetail.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
@@ -16,6 +16,8 @@ function ForumPostDetail() {
   const [editPostData, setEditPostData] = useState({ title: "", content: "", category: "" });
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState("");
+  const hasIncrementedView = useRef(false);
+  const lastPostId = useRef(null);
 
   const categories = [
     "Interview Tips",
@@ -55,12 +57,16 @@ function ForumPostDetail() {
           return;
         }
 
-        // Step 1: Increment the view count. We do this once on initial load.
-        // This is a "fire-and-forget" request; we don't need its response.
-        fetch(`http://localhost:1350/api/forum/posts/${postId}/view`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // Step 1: Increment the view count once per post load.
+        // We use a ref to prevent double-incrementing in development (StrictMode)
+        // or during successive data refreshes (like when liking/commenting).
+        if (lastPostId.current !== postId) {
+          fetch(`http://localhost:1350/api/forum/posts/${postId}/view`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          lastPostId.current = postId;
+        }
 
         // Step 2: Fetch the post and comment data to display.
         const response = await fetch(

@@ -3272,7 +3272,7 @@ app.get("/api/forum/my-posts", auth, async (req, res) => {
 // Get single post with comments
 app.get("/api/forum/posts/:postId", auth, async (req, res) => {
   try {
-    // --- MODIFIED LOGIC: Use findByIdAndUpdate to increment views ---
+    // --- MODIFIED LOGIC: Post retrieval without auto-increment ---
     const post = await ForumPost.findById(req.params.postId).populate(
       "author",
       "name email"
