@@ -8,6 +8,7 @@ import "./index.css";
 
 // Authentication Pages
 import App from "./App.jsx"; // Dev Login
+import LandingPage from "./pages/LandingPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPageWithOTP from "./pages/RegisterPageWithOTP.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
@@ -65,7 +66,7 @@ const router = createBrowserRouter([
   // ============================================
   {
     path: "/",
-    element: <LoginPage />, // Main login page
+    element: <LandingPage />, // Landing page
     errorElement: <ErrorPage />,
   },
   {
