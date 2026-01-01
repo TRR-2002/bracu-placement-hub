@@ -99,7 +99,7 @@ function Navbar() {
           <button
             onClick={() =>
               navigate(
-                user.role === "student" ? "/dashboard" : "/recruiter/dashboard"
+                user.role === "admin" ? "/admin/dashboard" : user.role === "student" ? "/dashboard" : "/recruiter/dashboard"
               )
             }
             className="flex items-center gap-2 text-white text-xl font-bold hover:text-blue-100 transition"
@@ -134,7 +134,13 @@ function Navbar() {
                 </NavLink>
               </>
             )}
-            {(user.role === "student" || user.role === "recruiter") && (
+            {user.role === "admin" && (
+              <NavLink to="/admin/dashboard" icon={LayoutDashboard}>
+                Dashboard
+              </NavLink>
+            )}
+            {/* Messages for all authenticated users */}
+            {["student", "recruiter", "admin"].includes(user.role) && (
               <>
                 <button
                   onClick={() => navigate("/messages")}
