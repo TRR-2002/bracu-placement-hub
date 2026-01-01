@@ -92,47 +92,7 @@ function NotificationsPage() {
     }
   };
 
-  const handleNotificationClick = (notification) => {
-    // Mark as read
-    if (!notification.read) {
-      handleMarkAsRead(notification._id);
-    }
 
-    // Check if notification has a valid link
-    if (!notification.link) {
-      console.log("Notification has no link, just marking as read");
-      return;
-    }
-
-    // Validate the link before navigating
-    const validPrefixes = [
-      '/jobs',
-      '/profile',
-      '/messages',
-      '/invitations',
-      '/forum',
-      '/calendar',
-      '/applications',
-      '/recruiter/',
-      '/admin/'
-    ];
-    
-    const linkBase = notification.link.split('?')[0].split('#')[0];
-    const isValidLink = validPrefixes.some(prefix => linkBase.startsWith(prefix)) || linkBase.startsWith('/');
-    
-    if (!isValidLink) {
-      console.warn("Invalid notification link:", notification.link);
-      setNotificationError(`This notification does not have a valid destination`);
-      return;
-    }
-    
-    try {
-      navigate(notification.link);
-    } catch (err) {
-      console.error("Navigation error:", err);
-      setNotificationError(`Unable to navigate to notification destination`);
-    }
-  };
 
   const getNotificationIcon = (type) => {
     const icons = {
@@ -276,8 +236,7 @@ function NotificationsPage() {
             {notifications.map((notification) => (
               <div
                 key={notification._id}
-                onClick={() => handleNotificationClick(notification)}
-                className={`bg-white rounded-lg shadow-md border-l-4 p-5 transition cursor-pointer hover:shadow-lg ${
+                className={`bg-white rounded-lg shadow-md border-l-4 p-5 transition ${
                   notification.read
                     ? "opacity-75 border-gray-300"
                     : getNotificationColor(notification.type)
@@ -350,8 +309,7 @@ function NotificationsPage() {
         {notifications.length > 0 && (
           <div className="mt-6 text-center text-sm text-gray-500">
             <p>
-              Click on a notification to view details{" "}
-              {notifications.some((n) => !n.read) && "and mark it as read"}
+              Use the "Mark Read" button to mark notifications as read
             </p>
           </div>
         )}
