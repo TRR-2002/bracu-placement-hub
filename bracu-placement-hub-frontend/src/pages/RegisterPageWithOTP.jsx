@@ -145,6 +145,14 @@ function RegisterPageWithOTP() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/')}
+          className="mb-6 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold transition"
+        >
+          <span>←</span> Back to Home
+        </button>
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
